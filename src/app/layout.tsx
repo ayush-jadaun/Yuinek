@@ -3,11 +3,11 @@ import "./globals.css";
 import { ReactNode } from "react";
 import Header from "@/components/homepage/Header";
 import Footer from "@/components/homepage/Footer";
-
 export const metadata = {
-  title: "Your Site",
+  title: "Yuinek",
   description: "Best fashion store in the Philippines",
 };
+
 
 const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
