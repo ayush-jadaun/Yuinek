@@ -183,9 +183,49 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/orders - Fetch user's orders (for a customer "My Orders" page)
 export async function GET(request: NextRequest) {
-  // A full implementation here would verify a user token,
-  // find their orders, and return them.
-  return NextResponse.json({ message: "Endpoint for fetching orders." });
+  try {
+    await connectDB();
+
+    // 1. Authenticate user
+    const token = request.cookies.get("accessToken")?.value;
+    if (!token) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+    const payload: JWTPayload | null = verifyAccessToken(token);
+    if (!payload) {
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    let orders;
+    const { searchParams } = new URL(request.url);
+    const fetchAll = searchParams.get("all") === "true";
+
+    // 2. Authorize and fetch data
+    if (payload.userType === "admin" && fetchAll) {
+      // Admin is requesting all orders
+      orders = await Order.find({})
+        .populate("user_id", "first_name last_name email") // Get user info
+        .sort({ createdAt: -1 });
+    } else {
+      // Customer is fetching their own orders
+      orders = await Order.find({ user_id: payload.userId }).sort({
+        createdAt: -1,
+      });
+    }
+
+    return NextResponse.json({ orders });
+  } catch (error: any) {
+    console.error("Orders GET error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch orders" },
+      { status: 500 }
+    );
+  }
 }
