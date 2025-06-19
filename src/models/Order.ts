@@ -1,52 +1,96 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export interface IOrder extends Document {
-  userId: mongoose.Types.ObjectId;
-  shippingAddressId: mongoose.Types.ObjectId;
-  items: mongoose.Types.ObjectId[]; // orderItems _id
-  totalAmount: number;
-  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
-  paymentStatus: "pending" | "success" | "failed";
-  trackingId?: string;
-  courier?: string;
-  estimatedDelivery?: Date;
-  placedAt: Date;
-  paidAt?: Date;
-  shippedAt?: Date;
-  deliveredAt?: Date;
-  cancelledAt?: Date;
+export interface IOrderItem {
+  product_id: mongoose.Types.ObjectId;
+  product_variant_id?: mongoose.Types.ObjectId;
+  product_name: string;
+  product_code: number;
+  size_name: string;
+  color_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
 }
+
+export interface IOrder extends Document {
+  order_number: string;
+  user_id: mongoose.Types.ObjectId;
+  status:
+    | "pending"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled"
+    | "refunded";
+  subtotal: number;
+  tax_amount: number;
+  shipping_amount: number;
+  discount_amount: number;
+  total_amount: number;
+  currency: string;
+  billing_address: object;
+  shipping_address: object;
+  items: IOrderItem[];
+  payment_method: string;
+  payment_status:
+    | "pending"
+    | "paid"
+    | "failed"
+    | "refunded"
+    | "partially_refunded";
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const OrderItemSchema = new Schema<IOrderItem>({
+  product_id: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+  product_variant_id: { type: Schema.Types.ObjectId },
+  product_name: { type: String, required: true },
+  product_code: { type: Number, required: true },
+  size_name: { type: String, required: true },
+  color_name: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 1 },
+  unit_price: { type: Number, required: true, min: 0 },
+  total_price: { type: Number, required: true, min: 0 },
+});
 
 const OrderSchema = new Schema<IOrder>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    shippingAddressId: {
-      type: Schema.Types.ObjectId,
-      ref: "Address",
-      required: true,
-    },
-    items: [{ type: Schema.Types.ObjectId, ref: "OrderItem", required: true }],
-    totalAmount: { type: Number, required: true },
+    order_number: { type: String, required: true, unique: true },
+    user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: {
       type: String,
-      enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
+      enum: [
+        "pending",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refunded",
+      ],
       default: "pending",
     },
-    paymentStatus: {
+    subtotal: { type: Number, required: true, min: 0 },
+    tax_amount: { type: Number, default: 0, min: 0 },
+    shipping_amount: { type: Number, default: 0, min: 0 },
+    discount_amount: { type: Number, default: 0, min: 0 },
+    total_amount: { type: Number, required: true, min: 0 },
+    currency: { type: String, default: "PHP" },
+    billing_address: { type: Schema.Types.Mixed, required: true },
+    shipping_address: { type: Schema.Types.Mixed, required: true },
+    items: [OrderItemSchema],
+    payment_method: { type: String, required: true },
+    payment_status: {
       type: String,
-      enum: ["pending", "success", "failed"],
+      enum: ["pending", "paid", "failed", "refunded", "partially_refunded"],
       default: "pending",
     },
-    trackingId: { type: String },
-    courier: { type: String },
-    estimatedDelivery: { type: Date },
-    placedAt: { type: Date, default: Date.now },
-    paidAt: { type: Date },
-    shippedAt: { type: Date },
-    deliveredAt: { type: Date },
-    cancelledAt: { type: Date },
+    notes: String,
   },
-  { timestamps: false }
+  {
+    timestamps: true,
+  }
 );
 
 export default mongoose.models.Order ||

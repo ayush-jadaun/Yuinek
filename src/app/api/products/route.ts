@@ -1,225 +1,128 @@
 import { NextRequest, NextResponse } from "next/server";
-import connectToDatabase from "@/lib/mongodb";
+import { connectDB } from "@/lib/db/mongodb";
 import Product from "@/models/Product";
-import mongoose from "mongoose";
+import Category from "@/models/Category";
+import Size from "@/models/Size";
+import Color from "@/models/Color";
 
-// GET /api/product?type=sneakers or /api/product?id=PRODUCT_ID
 export async function GET(request: NextRequest) {
-  await connectToDatabase();
-
-  const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type");
-  const id = searchParams.get("id");
-
   try {
-    // Search by ID
-    if (id) {
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return NextResponse.json(
-          { error: "Invalid product id" },
-          { status: 400 }
-        );
+    await connectDB();
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "12");
+    const category = searchParams.get("category");
+    const search = searchParams.get("search");
+    const minPrice = searchParams.get("minPrice");
+    const maxPrice = searchParams.get("maxPrice");
+    const featured = searchParams.get("featured");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
+
+    // Build query
+    let query: any = { is_active: true };
+
+    if (category) {
+      const categoryDoc = await Category.findOne({ slug: category });
+      if (categoryDoc) {
+        query.category_id = categoryDoc._id;
       }
-      const product = await Product.findById(id).lean();
-      if (!product) {
-        return NextResponse.json(
-          { error: "Product not found" },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json({ product }, { status: 200 });
     }
 
-    // Search by type or get all products
-    const query: any = {};
-
-    if (type) {
-      // Validate type against allowed values
-      const validTypes = ["formal", "sneakers", "loafers", "school", "sandals"];
-      if (!validTypes.includes(type.toLowerCase())) {
-        return NextResponse.json(
-          {
-            error: `Invalid product type. Valid types are: ${validTypes.join(
-              ", "
-            )}`,
-          },
-          { status: 400 }
-        );
-      }
-      query.type = type.toLowerCase();
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
-    // Only return active products by default
-    query.isActive = true;
+    if (minPrice || maxPrice) {
+      query.base_price = {};
+      if (minPrice) query.base_price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.base_price.$lte = parseFloat(maxPrice);
+    }
 
-    console.log("Search query:", query); // Debug log
+    if (featured === "true") {
+      query.is_featured = true;
+    }
 
-    const products = await Product.find(query).lean();
+    // Calculate pagination
+    const skip = (page - 1) * limit;
 
-    console.log(`Found ${products.length} products`); // Debug log
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+    // Execute query
+    const products = await Product.find(query)
+      .populate("category_id", "name slug")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await Product.countDocuments(query);
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      products,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalProducts: total,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error("Products GET error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch products" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    await connectDB();
+
+    const data = await request.json();
+
+    // Generate unique product code
+    const lastProduct = await Product.findOne().sort({ product_code: -1 });
+    const productCode = lastProduct ? lastProduct.product_code + 1 : 1000;
+
+    // Create slug from name
+    const slug = data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9 -]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
+
+    const product = await Product.create({
+      ...data,
+      product_code: productCode,
+      slug: `${slug}-${productCode}`,
+    });
+
+    const populatedProduct = await Product.findById(product._id).populate(
+      "category_id",
+      "name slug"
+    );
 
     return NextResponse.json(
       {
-        products,
-        count: products.length,
-        query: query, // Include query in response for debugging
+        message: "Product created successfully",
+        product: populatedProduct,
       },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("Database error:", error); // Debug log
-    return NextResponse.json(
-      { error: "Failed to fetch products", details: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/product
-export async function POST(request: NextRequest) {
-  await connectToDatabase();
-
-  try {
-    const body = await request.json();
-    const {
-      name,
-      description,
-      price,
-      stock,
-      images,
-      categoryId,
-      type,
-      variants,
-      isActive = true,
-    } = body;
-
-    if (!name || !price || !categoryId || !type) {
-      return NextResponse.json(
-        { error: "Missing required fields: name, price, categoryId, type" },
-        { status: 400 }
-      );
-    }
-
-    // Validate type
-    const validTypes = ["formal", "sneakers", "loafers", "school", "sandals"];
-    if (!validTypes.includes(type.toLowerCase())) {
-      return NextResponse.json(
-        {
-          error: `Invalid product type. Valid types are: ${validTypes.join(
-            ", "
-          )}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const newProduct = await Product.create({
-      name,
-      description,
-      price,
-      stock: stock || 0,
-      images: images || [],
-      categoryId,
-      type: type.toLowerCase(),
-      variants: variants || [],
-      isActive,
-    });
-
-    return NextResponse.json(
-      { message: "Product created successfully", product: newProduct },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Create product error:", error);
+  } catch (error) {
+    console.error("Products POST error:", error);
     return NextResponse.json(
-      { error: "Failed to create product", details: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// PATCH /api/product?id=PRODUCT_ID
-export async function PATCH(request: NextRequest) {
-  await connectToDatabase();
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-    return NextResponse.json(
-      { error: "Invalid or missing product id" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const update = await request.json();
-
-    // Validate type if it's being updated
-    if (update.type) {
-      const validTypes = ["formal", "sneakers", "loafers", "school", "sandals"];
-      if (!validTypes.includes(update.type.toLowerCase())) {
-        return NextResponse.json(
-          {
-            error: `Invalid product type. Valid types are: ${validTypes.join(
-              ", "
-            )}`,
-          },
-          { status: 400 }
-        );
-      }
-      update.type = update.type.toLowerCase();
-    }
-
-    const updatedProduct = await Product.findByIdAndUpdate(id, update, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!updatedProduct) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      { message: "Product updated successfully", product: updatedProduct },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("Update product error:", error);
-    return NextResponse.json(
-      { error: "Failed to update product", details: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/product?id=PRODUCT_ID
-export async function DELETE(request: NextRequest) {
-  await connectToDatabase();
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-    return NextResponse.json(
-      { error: "Invalid or missing product id" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const deleted = await Product.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      { message: "Product deleted successfully", product: deleted },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("Delete product error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete product", details: error.message },
+      { error: "Failed to create product" },
       { status: 500 }
     );
   }
