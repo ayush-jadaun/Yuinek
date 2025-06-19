@@ -1,8 +1,9 @@
 import mongoose, { Schema, Document } from "mongoose";
-
+import { IColor } from "./Color";
+import { ISize } from "./Size";
 export interface IProductVariant {
-  size_id: mongoose.Types.ObjectId;
-  color_id: mongoose.Types.ObjectId;
+  size_id: ISize;
+  color_id: IColor;
   stock_quantity: number;
   price_adjustment: number;
   is_active: boolean;
