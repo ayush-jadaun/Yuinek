@@ -9,13 +9,37 @@ import { ImageUpload } from "@/components/product/ImageUpload";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { generateSlug, generateProductCode } from "@/lib/utils/slug";
 import { validateProductForm } from "@/lib/utils/validation";
+import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 
-// Define a clean interface for categories in the form
+// Define interfaces
 interface CategoryOption {
   _id: string;
   name: string;
   slug: string;
   is_active: boolean;
+}
+
+interface ColorOption {
+  _id: string;
+  name: string;
+  hex_code?: string;
+}
+
+interface SizeOption {
+  _id: string;
+  us_size: string;
+  eu_size?: string;
+  uk_size?: string;
+  cm_size?: number;
+  gender: "men" | "women" | "kids";
+}
+
+interface ProductVariant {
+  color_id: string;
+  size_id: string;
+  sku: string;
+  price_adjustment: number;
+  stock_quantity: number;
 }
 
 interface ProductFormProps {
@@ -41,6 +65,7 @@ type FormData = {
   low_stock_threshold: number;
   meta_title: string;
   meta_description: string;
+  variants: ProductVariant[];
 };
 
 export default function ProductForm({ product }: ProductFormProps) {
@@ -66,63 +91,66 @@ export default function ProductForm({ product }: ProductFormProps) {
     low_stock_threshold: product?.low_stock_threshold || 5,
     meta_title: product?.meta_title || "",
     meta_description: product?.meta_description || "",
+    variants:
+      product?.variants?.map((v) => ({
+        color_id: typeof v.color_id === "object" ? v.color_id._id : v.color_id,
+        size_id: typeof v.size_id === "object" ? v.size_id._id : v.size_id,
+        sku: v.sku || "",
+        price_adjustment: v.price_adjustment || 0,
+        stock_quantity: v.stock_quantity || 0,
+      })) || [],
   });
 
-  // Use the clean CategoryOption interface
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [colors, setColors] = useState<ColorOption[]>([]);
+  const [sizes, setSizes] = useState<SizeOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch categories, colors, and sizes
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch("/api/categories");
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(
-            errorData.error || `HTTP ${res.status}: Failed to fetch categories`
-          );
+        const [categoriesRes, colorsRes, sizesRes] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/admin/colors"),
+          fetch("/api/admin/sizes"),
+        ]);
+
+        if (categoriesRes.ok) {
+          const categoriesData = await categoriesRes.json();
+          setCategories(categoriesData.categories || []);
         }
 
-        const data = await res.json();
-
-        if (!data.categories || !Array.isArray(data.categories)) {
-          throw new Error("Invalid categories data received");
+        if (colorsRes.ok) {
+          const colorsData = await colorsRes.json();
+          setColors(colorsData.colors || []);
         }
 
-        // Map the response to ensure we have the right types
-        const categoriesWithStringIds = data.categories.map((cat: any) => ({
-          _id: cat._id.toString(), // Ensure _id is a string
-          name: cat.name,
-          slug: cat.slug,
-          is_active: cat.is_active,
-        }));
-
-        setCategories(categoriesWithStringIds);
+        if (sizesRes.ok) {
+          const sizesData = await sizesRes.json();
+          setSizes(sizesData.sizes || []);
+        }
 
         // Set default category for new products
         if (
           !product &&
-          categoriesWithStringIds.length > 0 &&
+          categoriesData.categories?.length > 0 &&
           !formData.category_id
         ) {
           setFormData((prev) => ({
             ...prev,
-            category_id: categoriesWithStringIds[0]._id,
+            category_id: categoriesData.categories[0]._id,
           }));
         }
       } catch (err) {
-        console.error("Categories fetch error:", err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Could not load categories. Please try again."
-        );
+        console.error("Failed to fetch data:", err);
+        setError("Failed to load form data");
       }
     };
 
-    fetchCategories();
-  }, [product, formData.category_id]);
+    fetchData();
+  }, []);
 
   // Generate product code for new products
   useEffect(() => {
@@ -161,6 +189,66 @@ export default function ProductForm({ product }: ProductFormProps) {
     }
   };
 
+  // Variant management functions
+  const addVariant = () => {
+    if (colors.length === 0 || sizes.length === 0) {
+      setError("Please add colors and sizes first in the admin panel");
+      return;
+    }
+
+    const newVariant: ProductVariant = {
+      color_id: colors[0]._id,
+      size_id: sizes[0]._id,
+      sku: `${formData.product_code}-${colors[0].name}-${sizes[0].us_size}`.toUpperCase(),
+      price_adjustment: 0,
+      stock_quantity: 0,
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      variants: [...prev.variants, newVariant],
+    }));
+  };
+
+  const removeVariant = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateVariant = (
+    index: number,
+    field: keyof ProductVariant,
+    value: string | number
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.map((variant, i) => {
+        if (i === index) {
+          const updated = { ...variant, [field]: value };
+
+          // Auto-generate SKU when color or size changes
+          if (field === "color_id" || field === "size_id") {
+            const color = colors.find(
+              (c) => c._id === (field === "color_id" ? value : variant.color_id)
+            );
+            const size = sizes.find(
+              (s) => s._id === (field === "size_id" ? value : variant.size_id)
+            );
+            if (color && size) {
+              updated.sku =
+                `${formData.product_code}-${color.name}-${size.us_size}`.toUpperCase();
+            }
+          }
+
+          return updated;
+        }
+        return variant;
+      }),
+    }));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -168,6 +256,14 @@ export default function ProductForm({ product }: ProductFormProps) {
     const validation = validateProductForm(formData);
     if (!validation.isValid) {
       setError(validation.errors.join(", "));
+      return;
+    }
+
+    // Validate variants
+    if (formData.variants.length === 0) {
+      setError(
+        "Please add at least one product variant (color and size combination)"
+      );
       return;
     }
 
@@ -224,9 +320,9 @@ export default function ProductForm({ product }: ProductFormProps) {
   };
 
   const isFormReady =
-    product || (categories.length > 0 && formData.category_id);
+    categories.length > 0 && colors.length > 0 && sizes.length > 0;
 
-  if (categories.length === 0 && !error) {
+  if (!isFormReady && !error) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-4 bg-gray-200 rounded w-1/4"></div>
@@ -509,6 +605,138 @@ export default function ProductForm({ product }: ProductFormProps) {
             />
           </div>
 
+          {/* Product Variants Section */}
+          <div className="sm:col-span-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="text-lg font-medium text-gray-900">
+                  Product Variants
+                </h4>
+                <p className="text-sm text-gray-500">
+                  Add different color and size combinations for this product
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={addVariant}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add Variant
+              </Button>
+            </div>
+
+            {formData.variants.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <p className="text-gray-500">
+                  No variants added yet. Click "Add Variant" to create color and
+                  size combinations.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {formData.variants.map((variant, index) => (
+                  <div
+                    key={index}
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                  >
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Color
+                        </label>
+                        <select
+                          value={variant.color_id}
+                          onChange={(e) =>
+                            updateVariant(index, "color_id", e.target.value)
+                          }
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {colors.map((color) => (
+                            <option key={color._id} value={color._id}>
+                              {color.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Size
+                        </label>
+                        <select
+                          value={variant.size_id}
+                          onChange={(e) =>
+                            updateVariant(index, "size_id", e.target.value)
+                          }
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          {sizes.map((size) => (
+                            <option key={size._id} value={size._id}>
+                              {size.us_size} US ({size.gender})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Price Adj.
+                        </label>
+                        <Input
+                          type="number"
+                          value={variant.price_adjustment}
+                          onChange={(e) =>
+                            updateVariant(
+                              index,
+                              "price_adjustment",
+                              Number(e.target.value)
+                            )
+                          }
+                          step="0.01"
+                          placeholder="0.00"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Stock
+                        </label>
+                        <Input
+                          type="number"
+                          value={variant.stock_quantity}
+                          onChange={(e) =>
+                            updateVariant(
+                              index,
+                              "stock_quantity",
+                              Number(e.target.value)
+                            )
+                          }
+                          min="0"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">SKU:</span> {variant.sku}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* SEO */}
           <div className="sm:col-span-6">
             <label
@@ -626,6 +854,32 @@ export default function ProductForm({ product }: ProductFormProps) {
         </div>
       )}
 
+      {colors.length === 0 || sizes.length === 0 ? (
+        <div className="rounded-md bg-yellow-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                Setup Required
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>
+                  You need to add colors and sizes first before creating
+                  products. Visit the{" "}
+                  <a href="/admin/colors" className="underline">
+                    Colors
+                  </a>{" "}
+                  and{" "}
+                  <a href="/admin/sizes" className="underline">
+                    Sizes
+                  </a>{" "}
+                  sections to set them up.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="pt-5">
         <div className="flex justify-end space-x-3">
           <Button
@@ -635,7 +889,12 @@ export default function ProductForm({ product }: ProductFormProps) {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading || !isFormReady}>
+          <Button
+            type="submit"
+            disabled={
+              isLoading || !isFormReady || formData.variants.length === 0
+            }
+          >
             {isLoading
               ? "Saving..."
               : `${product ? "Update" : "Create"} Product`}
