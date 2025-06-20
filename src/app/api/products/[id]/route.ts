@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongodb";
-import Product from "@/models/Product";
 import mongoose from "mongoose";
+
+// Import ALL models to ensure they're registered BEFORE using them
+import Product from "@/models/Product";
+import Category from "@/models/Category";
+import Size from "@/models/Size";
+import Color from "@/models/Color";
 
 interface Params {
   id: string;
@@ -9,12 +14,13 @@ interface Params {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
 
-    const { id } = params;
+    // Await params before using
+    const { id } = await params;
 
     // Check if it's a valid ObjectId or slug
     let product;
@@ -28,13 +34,28 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Populate related data
-    const populatedProduct = await Product.findById(product._id)
-      .populate("category_id", "name slug")
-      .populate("variants.size_id", "us_size eu_size uk_size cm_size gender")
-      .populate("variants.color_id", "name hex_code");
+    // Try to populate, but if it fails, return the product without population
+    try {
+      const populatedProduct = await Product.findById(product._id)
+        .populate("category_id", "name slug")
+        .populate({
+          path: "variants.size_id",
+          select: "us_size eu_size uk_size cm_size gender",
+          model: "Size", // Explicitly specify the model
+        })
+        .populate({
+          path: "variants.color_id",
+          select: "name hex_code",
+          model: "Color", // Explicitly specify the model
+        })
+        .lean();
 
-    return NextResponse.json({ product: populatedProduct });
+      return NextResponse.json({ product: populatedProduct });
+    } catch (populateError) {
+      console.error("Population error:", populateError);
+      // Return the basic product without population if populate fails
+      return NextResponse.json({ product: product.toObject() });
+    }
   } catch (error) {
     console.error("Product GET error:", error);
     return NextResponse.json(
@@ -46,13 +67,22 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
 
-    const { id } = params;
+    // Await params before using
+    const { id } = await params;
     const data = await request.json();
+
+    // Validate the ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
 
     const product = await Product.findByIdAndUpdate(
       id,
@@ -79,12 +109,21 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
 
-    const { id } = params;
+    // Await params before using
+    const { id } = await params;
+
+    // Validate the ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid product ID" },
+        { status: 400 }
+      );
+    }
 
     // Soft delete - set is_active to false
     const product = await Product.findByIdAndUpdate(

@@ -17,12 +17,16 @@ async function getProduct(id: string): Promise<IProduct | null> {
   }
 }
 
+interface EditProductPageProps {
+  params: Promise<{ id: string }>; // ✅ Changed to Promise
+}
+
 export default async function EditProductPage({
   params,
-}: {
-  params: { id: string };
-}) {
-  const product = await getProduct(params.id);
+}: EditProductPageProps) {
+ 
+  const { id } = await params;
+  const product = await getProduct(id);
 
   if (!product) {
     return <p>Product not found.</p>;
