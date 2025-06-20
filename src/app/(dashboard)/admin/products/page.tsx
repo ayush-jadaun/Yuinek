@@ -1,9 +1,8 @@
-// src/app/(dashboard)/admin/products/page.tsx
-
 import Link from "next/link";
 import Image from "next/image";
 import { IProduct } from "@/models/Product";
 import { Button } from "@/components/ui/Button";
+import DeleteProductButton from "@/components/product/DeleteProductButton";
 
 async function getProducts() {
   try {
@@ -82,7 +81,7 @@ export default async function AdminProductsPage() {
                       scope="col"
                       className="relative py-3.5 pl-3 pr-4 sm:pr-6"
                     >
-                      <span className="sr-only">Edit</span>
+                      <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
@@ -131,12 +130,20 @@ export default async function AdminProductsPage() {
                         {product.stock_quantity}
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <Link
-                          href={`/admin/products/${product._id}/edit`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit<span className="sr-only">, {product.name}</span>
-                        </Link>
+                        <div className="flex items-center justify-end space-x-2">
+                          <Link
+                            href={`/admin/products/${product._id}/edit`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </Link>
+                          <span className="text-gray-300">|</span>
+                          <DeleteProductButton
+                            productId={product._id.toString()}
+                            productName={product.name}
+                            compact={true}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}

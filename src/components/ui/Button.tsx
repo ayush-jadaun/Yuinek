@@ -1,37 +1,57 @@
-// src/components/ui/Button.tsx
-
 import React from "react";
 
-// Define the props for the button. We extend the standard HTML button attributes.
-// This allows us to pass any valid button prop like `onClick`, `type`, etc.
+// Define the props for the button
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  // We can add custom props here if needed, e.g., variant, size
-  // For now, we'll keep it simple.
+  variant?: "default" | "outline" | "secondary" | "danger";
+  size?: "sm" | "md" | "lg";
 }
 
 // Use React.forwardRef to allow parent components to get a ref to the button element
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, children, ...props }, ref) => {
-    // Define the base styles for the button
+  (
+    { className, children, variant = "default", size = "md", ...props },
+    ref
+  ) => {
+    // Base styles for all buttons
     const baseStyles =
-      "flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold leading-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2";
+      "inline-flex items-center justify-center rounded-md font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors";
 
-    // Define styles for different states
-    const activeStyles =
-      "bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600";
+    // Variant styles
+    const variantStyles = {
+      default:
+        "bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600",
+      outline:
+        "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-gray-500",
+      secondary:
+        "bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:outline-gray-500",
+      danger:
+        "bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600",
+    };
 
-    const disabledStyles = "bg-gray-400 text-gray-200 cursor-not-allowed";
+    // Size styles
+    const sizeStyles = {
+      sm: "px-2 py-1 text-sm h-8",
+      md: "px-3 py-2 text-sm h-10",
+      lg: "px-4 py-3 text-base h-12",
+    };
+
+    // Disabled styles
+    const disabledStyles = "opacity-50 cursor-not-allowed pointer-events-none";
 
     return (
       <button
         ref={ref}
         className={`
           ${baseStyles} 
-          ${props.disabled ? disabledStyles : activeStyles} 
-          ${className} // Allow overriding styles with the className prop
-        `}
-        {...props} // Spread the rest of the props (e.g., type, disabled, onClick)
+          ${variantStyles[variant]}
+          ${sizeStyles[size]}
+          ${props.disabled ? disabledStyles : ""} 
+          ${className || ""} 
+        `
+          .trim()
+          .replace(/\s+/g, " ")}
+        {...props}
       >
         {children}
       </button>
