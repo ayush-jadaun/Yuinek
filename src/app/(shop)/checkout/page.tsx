@@ -22,23 +22,20 @@ export default function CheckoutPage() {
     const fetchUserData = async () => {
       try {
         setUserLoading(true);
-        // Create a proper user profile endpoint instead of using refresh-token
         const res = await fetch("/api/users/profile", {
           method: "GET",
-          credentials: "include", // Include cookies for authentication
+          credentials: "include",
         });
 
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
-          // Set default selected addresses
           if (data.user.addresses?.length > 0) {
             const defaultAddress = data.user.addresses[0]._id;
             setShippingAddressId(defaultAddress);
-            setBillingAddressId(defaultAddress); // Same as shipping by default
+            setBillingAddressId(defaultAddress);
           }
         } else if (res.status === 401) {
-          // User not authenticated, redirect to login
           router.push("/auth/login?redirect=/checkout");
         } else {
           setError("Failed to load user data");
@@ -107,22 +104,21 @@ export default function CheckoutPage() {
       const orderPayload = {
         items: items.map((item) => ({
           productId: item.productId,
-          sizeId: item.sizeId, // Make sure your cart store has sizeId
-          colorId: item.colorId, // Make sure your cart store has colorId
+          sizeId: item.sizeId,
+          colorId: item.colorId,
           quantity: item.quantity,
-          // Add any other required fields from your cart item structure
         })),
         shippingAddressId,
         billingAddressId,
         paymentMethod,
       };
 
-      console.log("Creating order with payload:", orderPayload); // For debugging
+      console.log("Creating order with payload:", orderPayload);
 
       const orderRes = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // Include cookies for authentication
+        credentials: "include",
         body: JSON.stringify(orderPayload),
       });
 
@@ -133,31 +129,39 @@ export default function CheckoutPage() {
 
       const orderData = await orderRes.json();
 
-      // 2. Create a Stripe session for the order
-      const stripeRes = await fetch("/api/payments/stripe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          cartItems: items,
-          orderId: orderData.order._id,
-        }),
-      });
+      // 2. Handle different payment methods
+      if (paymentMethod === "cod") {
+        // For Cash on Delivery, we don't need Stripe
+        // Just clear cart and redirect to success page
+        clearCart();
+        router.push(`/order-confirmation/${orderData.order._id}?payment=cod`);
+      } else {
+        // For Stripe payment
+        const stripeRes = await fetch("/api/payments/stripe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            cartItems: items,
+            orderId: orderData.order._id,
+          }),
+        });
 
-      if (!stripeRes.ok) {
-        const errorData = await stripeRes.json();
-        throw new Error(
-          errorData.error || "Failed to connect to payment provider"
-        );
+        if (!stripeRes.ok) {
+          const errorData = await stripeRes.json();
+          throw new Error(
+            errorData.error || "Failed to connect to payment provider"
+          );
+        }
+
+        const stripeData = await stripeRes.json();
+
+        // Clear the cart only after successful order creation and payment setup
+        clearCart();
+
+        // Redirect to Stripe
+        window.location.href = stripeData.url;
       }
-
-      const stripeData = await stripeRes.json();
-
-      // Clear the cart only after successful order creation and payment setup
-      clearCart();
-
-      // Redirect to Stripe
-      window.location.href = stripeData.url;
     } catch (err: any) {
       console.error("Checkout error:", err);
       setError(err.message || "An error occurred during checkout");
@@ -189,6 +193,10 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  // Calculate COD fee (optional)
+  const codFee = paymentMethod === "cod" ? 50 : 0; // ₱50 COD handling fee
+  const finalTotal = getTotalPrice() + getTotalPrice() * 0.12 + 150 + codFee;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -271,18 +279,43 @@ export default function CheckoutPage() {
           {/* Payment Method */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
-            <div className="space-y-2">
-              <label className="flex items-center">
+            <div className="space-y-3">
+              <label className="flex items-start">
                 <input
                   type="radio"
                   value="stripe"
                   checked={paymentMethod === "stripe"}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="mr-2"
+                  className="mr-3 mt-1"
                 />
-                Credit/Debit Card (Stripe)
+                <div>
+                  <div className="font-medium">Credit/Debit Card</div>
+                  <div className="text-sm text-gray-500">
+                    Pay securely with your credit or debit card via Stripe
+                  </div>
+                </div>
               </label>
-              {/* Add more payment methods as needed */}
+
+              <label className="flex items-start">
+                <input
+                  type="radio"
+                  value="cod"
+                  checked={paymentMethod === "cod"}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="mr-3 mt-1"
+                />
+                <div>
+                  <div className="font-medium">Cash on Delivery (COD)</div>
+                  <div className="text-sm text-gray-500">
+                    Pay with cash when your order is delivered
+                    {codFee > 0 && (
+                      <span className="text-orange-600 block">
+                        Additional handling fee: ₱{codFee.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
         </div>
@@ -321,15 +354,19 @@ export default function CheckoutPage() {
                 <span>Shipping</span>
                 <span>₱150.00</span>
               </div>
+              {codFee > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>COD Handling Fee</span>
+                  <span>₱{codFee.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <hr className="my-4" />
 
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>
-                ₱{(getTotalPrice() + getTotalPrice() * 0.12 + 150).toFixed(2)}
-              </span>
+              <span>₱{finalTotal.toFixed(2)}</span>
             </div>
 
             <Button
@@ -342,8 +379,21 @@ export default function CheckoutPage() {
               }
               className="w-full mt-6"
             >
-              {isLoading ? "Processing..." : "Proceed to Payment"}
+              {isLoading
+                ? "Processing..."
+                : paymentMethod === "cod"
+                ? "Place Order (COD)"
+                : "Proceed to Payment"}
             </Button>
+
+            {paymentMethod === "cod" && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Please have the exact amount ready when
+                  your order arrives.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
