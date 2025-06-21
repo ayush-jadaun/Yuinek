@@ -8,10 +8,10 @@ export interface CartItem {
   name: string;
   slug: string;
   image: string;
-  size: string; // e.g., "US 9"
-  color: string; // e.g., "Red"
-  quantity: number;
+  sizeId: string;
+  colorId: string;
   price: number;
+  quantity: number;
 }
 
 // Define a unique identifier for a cart item

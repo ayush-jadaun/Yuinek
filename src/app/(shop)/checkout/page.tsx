@@ -1,5 +1,3 @@
-// src/app/(shop)/checkout/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,111 +10,336 @@ export default function CheckoutPage() {
   const { items, getTotalPrice, clearCart } = useCartStore();
   const [user, setUser] = useState<IUser | null>(null);
   const [shippingAddressId, setShippingAddressId] = useState<string>("");
+  const [billingAddressId, setBillingAddressId] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("stripe");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+  const [userLoading, setUserLoading] = useState(true);
   const router = useRouter();
 
   // Fetch user data (including addresses) on component mount
   useEffect(() => {
     const fetchUserData = async () => {
-      // In a real app, you'd have an API route like /api/users/me
-      // For now, we'll re-use the refresh-token logic as a placeholder
-      const res = await fetch("/api/auth/refresh-token", { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-        // Set default selected address
-        if (data.user.addresses?.length > 0) {
-          setShippingAddressId(data.user.addresses[0]._id);
+      try {
+        setUserLoading(true);
+        // Create a proper user profile endpoint instead of using refresh-token
+        const res = await fetch("/api/users/profile", {
+          method: "GET",
+          credentials: "include", // Include cookies for authentication
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          // Set default selected addresses
+          if (data.user.addresses?.length > 0) {
+            const defaultAddress = data.user.addresses[0]._id;
+            setShippingAddressId(defaultAddress);
+            setBillingAddressId(defaultAddress); // Same as shipping by default
+          }
+        } else if (res.status === 401) {
+          // User not authenticated, redirect to login
+          router.push("/auth/login?redirect=/checkout");
+        } else {
+          setError("Failed to load user data");
         }
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+        setError("Failed to load user data");
+      } finally {
+        setUserLoading(false);
       }
     };
+
     fetchUserData();
-  }, []);
+  }, [router]);
+
+  // Redirect if cart is empty
+  useEffect(() => {
+    if (!userLoading && items.length === 0) {
+      router.push("/cart");
+    }
+  }, [items.length, userLoading, router]);
+
+  const validateCheckout = () => {
+    if (!user) {
+      setError("User not authenticated");
+      return false;
+    }
+
+    if (!shippingAddressId) {
+      setError("Please select a shipping address");
+      return false;
+    }
+
+    if (!billingAddressId) {
+      setError("Please select a billing address");
+      return false;
+    }
+
+    if (items.length === 0) {
+      setError("Your cart is empty");
+      return false;
+    }
+
+    // Validate cart items have required fields
+    for (const item of items) {
+      if (!item.productId || !item.sizeId || !item.colorId) {
+        setError("Invalid cart items. Please refresh and try again.");
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const handleCheckout = async () => {
+    setError("");
+
+    if (!validateCheckout()) {
+      return;
+    }
+
     setIsLoading(true);
-    // 1. Create an order in our database
-    const orderRes = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: items.map((i) => ({ ...i, sizeId: i.size, colorId: i.color })), // Simplification for demo
-        shippingAddressId: shippingAddressId,
-        billingAddressId: shippingAddressId, // Assuming same as shipping
-        paymentMethod: "stripe",
-      }),
-    });
 
-    if (!orderRes.ok) {
-      alert("Failed to create order.");
+    try {
+      // 1. Create an order in our database
+      const orderPayload = {
+        items: items.map((item) => ({
+          productId: item.productId,
+          sizeId: item.sizeId, // Make sure your cart store has sizeId
+          colorId: item.colorId, // Make sure your cart store has colorId
+          quantity: item.quantity,
+          // Add any other required fields from your cart item structure
+        })),
+        shippingAddressId,
+        billingAddressId,
+        paymentMethod,
+      };
+
+      console.log("Creating order with payload:", orderPayload); // For debugging
+
+      const orderRes = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Include cookies for authentication
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (!orderRes.ok) {
+        const errorData = await orderRes.json();
+        throw new Error(errorData.error || "Failed to create order");
+      }
+
+      const orderData = await orderRes.json();
+
+      // 2. Create a Stripe session for the order
+      const stripeRes = await fetch("/api/payments/stripe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          cartItems: items,
+          orderId: orderData.order._id,
+        }),
+      });
+
+      if (!stripeRes.ok) {
+        const errorData = await stripeRes.json();
+        throw new Error(
+          errorData.error || "Failed to connect to payment provider"
+        );
+      }
+
+      const stripeData = await stripeRes.json();
+
+      // Clear the cart only after successful order creation and payment setup
+      clearCart();
+
+      // Redirect to Stripe
+      window.location.href = stripeData.url;
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+      setError(err.message || "An error occurred during checkout");
+    } finally {
       setIsLoading(false);
-      return;
     }
-    const orderData = await orderRes.json();
-
-    // 2. Create a Stripe session for the order
-    const stripeRes = await fetch("/api/payments/stripe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartItems: items, orderId: orderData.order._id }),
-    });
-
-    if (!stripeRes.ok) {
-      alert("Failed to connect to payment provider.");
-      setIsLoading(false);
-      return;
-    }
-
-    const stripeData = await stripeRes.json();
-    clearCart(); // Clear the cart before redirecting
-    router.push(stripeData.url); // Redirect to Stripe
   };
+
+  if (userLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+          <p className="mb-4">Please log in to continue with checkout.</p>
+          <Button onClick={() => router.push("/auth/login?redirect=/checkout")}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Checkout</h1>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-6">
+          {/* Shipping Address */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
-            {user?.addresses && user.addresses.length > 0 ? (
+            {user.addresses && user.addresses.length > 0 ? (
               <select
                 value={shippingAddressId}
                 onChange={(e) => setShippingAddressId(e.target.value)}
-                className="w-full p-2 border rounded-md"
+                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               >
+                <option value="">Select shipping address</option>
                 {user.addresses.map((addr: any) => (
                   <option key={addr._id} value={addr._id}>
-                    {addr.address_line_1}, {addr.city}, {addr.postal_code}
+                    {addr.address_line_1}, {addr.city}, {addr.state}{" "}
+                    {addr.postal_code}
                   </option>
                 ))}
               </select>
             ) : (
-              <p>No addresses found. Please add one in your profile.</p>
+              <div className="text-center py-4">
+                <p className="mb-4">
+                  No addresses found. Please add one in your profile.
+                </p>
+                <Button onClick={() => router.push("/profile?tab=addresses")}>
+                  Add Address
+                </Button>
+              </div>
             )}
           </div>
-        </div>
-        <div className="md:col-span-1">
+
+          {/* Billing Address */}
           <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold mb-4">Billing Address</h2>
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={billingAddressId === shippingAddressId}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setBillingAddressId(shippingAddressId);
+                    }
+                  }}
+                  className="mr-2"
+                />
+                Same as shipping address
+              </label>
+            </div>
+            {user.addresses && user.addresses.length > 0 && (
+              <select
+                value={billingAddressId}
+                onChange={(e) => setBillingAddressId(e.target.value)}
+                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select billing address</option>
+                {user.addresses.map((addr: any) => (
+                  <option key={addr._id} value={addr._id}>
+                    {addr.address_line_1}, {addr.city}, {addr.state}{" "}
+                    {addr.postal_code}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Payment Method */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="stripe"
+                  checked={paymentMethod === "stripe"}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="mr-2"
+                />
+                Credit/Debit Card (Stripe)
+              </label>
+              {/* Add more payment methods as needed */}
+            </div>
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="md:col-span-1">
+          <div className="bg-white p-6 rounded-lg shadow-md sticky top-4">
             <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-            <ul>
+            <div className="space-y-2 mb-4">
               {items.map((item) => (
-                <li key={item.productId} className="flex justify-between py-1">
-                  <span>
-                    {item.name} x{item.quantity}
+                <div
+                  key={`${item.productId}-${item.sizeId}-${item.colorId}`}
+                  className="flex justify-between py-1 text-sm"
+                >
+                  <span className="flex-1">
+                    {item.name}
+                    <span className="text-gray-500"> x{item.quantity}</span>
                   </span>
                   <span>₱{(item.price * item.quantity).toFixed(2)}</span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
+
             <hr className="my-4" />
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>₱{getTotalPrice().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax (12%)</span>
+                <span>₱{(getTotalPrice() * 0.12).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span>₱150.00</span>
+              </div>
+            </div>
+
+            <hr className="my-4" />
+
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>₱{getTotalPrice().toFixed(2)}</span>
+              <span>
+                ₱{(getTotalPrice() + getTotalPrice() * 0.12 + 150).toFixed(2)}
+              </span>
             </div>
+
             <Button
               onClick={handleCheckout}
-              disabled={isLoading || items.length === 0}
+              disabled={
+                isLoading ||
+                items.length === 0 ||
+                !shippingAddressId ||
+                !billingAddressId
+              }
               className="w-full mt-6"
             >
               {isLoading ? "Processing..." : "Proceed to Payment"}

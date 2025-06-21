@@ -1,11 +1,11 @@
-// src/app/api/orders/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongodb";
 import { verifyAccessToken, JWTPayload } from "@/lib/auth/jwt";
 import Order from "@/models/Order";
 import User from "@/models/User";
 import Product from "@/models/Product";
+import Size from "@/models/Size"; 
+import Color from "@/models/Color"; 
 import mongoose from "mongoose";
 
 // Function to generate a unique order number
@@ -71,10 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     const shipping_address = user.addresses.find(
-      (addr) => addr._id.toString() === shippingAddressId
+      (addr:any) => addr._id.toString() === shippingAddressId
     );
     const billing_address = user.addresses.find(
-      (addr) => addr._id.toString() === billingAddressId
+      (addr:any) => addr._id.toString() === billingAddressId
     );
 
     if (!shipping_address || !billing_address) {
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       }
 
       const variant = product.variants.find(
-        (v) =>
+        (v:any) =>
           v.size_id.toString() === item.sizeId &&
           v.color_id.toString() === item.colorId
       );
@@ -108,6 +108,16 @@ export async function POST(request: NextRequest) {
         throw new Error(`Insufficient stock for ${product.name}.`);
       }
 
+      // Fetch size and color details
+      const size = await Size.findById(item.sizeId);
+      const color = await Color.findById(item.colorId);
+
+      if (!size || !color) {
+        throw new Error(
+          `Size or color information not found for product ${product.name}.`
+        );
+      }
+
       const price = product.sale_price || product.base_price;
       const adjustedPrice = price + (variant.price_adjustment || 0);
       const total_price = adjustedPrice * item.quantity;
@@ -115,11 +125,13 @@ export async function POST(request: NextRequest) {
 
       orderItems.push({
         product_id: product._id,
-        // product_variant_id is missing from your model, but would be good to add
+        // Store the variant IDs for stock updates
+        variant_size_id: item.sizeId,
+        variant_color_id: item.colorId,
         product_name: product.name,
         product_code: product.product_code,
-        size_name: variant.size_id.us_size, // Assuming population or direct access
-        color_name: variant.color_id.name, // Assuming population or direct access
+        size_name: size.us_size || size.name, // Use appropriate field from Size model
+        color_name: color.name,
         quantity: item.quantity,
         unit_price: adjustedPrice,
         total_price: total_price,
@@ -129,34 +141,43 @@ export async function POST(request: NextRequest) {
     // In a real app, calculate tax and shipping
     const tax_amount = subtotal * 0.12; // Example 12% tax
     const shipping_amount = 150; // Example flat rate shipping
-    const total_amount = subtotal + tax_amount + shipping_amount;
+    const discount_amount = 0; // Add discount logic if needed
+    const total_amount =
+      subtotal + tax_amount + shipping_amount - discount_amount;
     const order_number = await generateOrderNumber();
 
-    // 5. Create the order
+    // 5. Create the order (remove variant IDs from order items before saving)
+    const orderItemsForSave = orderItems.map(
+      ({ variant_size_id, variant_color_id, ...item }) => item
+    );
+
     const newOrder = new Order({
       order_number,
       user_id: user._id,
-      items: orderItems,
+      items: orderItemsForSave,
       subtotal,
       tax_amount,
       shipping_amount,
+      discount_amount,
       total_amount,
       shipping_address,
       billing_address,
-      payment_method,
+      paymentMethod,
       status: "pending",
       payment_status: "pending",
     });
 
     await newOrder.save();
 
-    // 6. Decrement stock (important!)
+    // 6. Decrement stock (fixed the field references)
     for (const item of orderItems) {
       await Product.updateOne(
         {
           _id: item.product_id,
-          "variants.size_id": item.size_id,
-          "variants.color_id": item.color_id,
+          "variants.size_id": new mongoose.Types.ObjectId(item.variant_size_id),
+          "variants.color_id": new mongoose.Types.ObjectId(
+            item.variant_color_id
+          ),
         },
         {
           $inc: {

@@ -84,7 +84,7 @@ export async function PUT(
 
     // Authenticate and Authorize as Admin
     const token = request.cookies.get("accessToken")?.value;
-    const payload: JWTPayload | null = verifyAccessToken(token);
+    const payload: JWTPayload | null = verifyAccessToken(token!);
     if (!payload || payload.userType !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },

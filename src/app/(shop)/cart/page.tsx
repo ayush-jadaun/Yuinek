@@ -1,20 +1,15 @@
-// src/app/(shop)/cart/page.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
 import CartItem from "@/components/cart/CartItem";
 import { Button } from "@/components/ui/Button";
-import type { Metadata } from "next";
-
-// Note: You can't export Metadata from a client component directly.
-// You would set this in a parent layout or a separate `head.js` file if needed.
-// For now, we'll focus on the component logic.
 
 const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-PH", {
+    // Fixed: PHP should be PH for Philippines
     style: "currency",
     currency: "PHP",
   }).format(price);
@@ -22,12 +17,18 @@ const formatPrice = (price: number) => {
 
 export default function CartPage() {
   const { items, getTotalPrice } = useCartStore();
+  const router = useRouter();
   // This state ensures the component only renders on the client, avoiding hydration mismatches.
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const handleCheckout = () => {
+    // Navigate to checkout page
+    router.push("/checkout");
+  };
 
   if (!isClient) {
     // Render a loading state or null on the server
@@ -43,17 +44,19 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-          Your Shopping Cart is Empty
-        </h1>
-        <p className="mt-4 text-lg text-gray-600">
-          Looks like you haven't added anything to your cart yet.
-        </p>
-        <div className="mt-6">
-          <Link href="/products">
-            <Button>Continue Shopping</Button>
-          </Link>
+      <div className="mx-auto max-w-2xl px-4 pt-16 pb-24 sm:px-6 lg:max-w-7xl lg:px-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            Your Shopping Cart is Empty
+          </h1>
+          <p className="mt-4 text-lg text-gray-600">
+            Looks like you haven't added anything to your cart yet.
+          </p>
+          <div className="mt-6">
+            <Link href="/products">
+              <Button>Continue Shopping</Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -64,7 +67,9 @@ export default function CartPage() {
       <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
         Shopping Cart
       </h1>
-      <form className="mt-12 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-12 xl:gap-x-16">
+
+      {/* Removed the form wrapper since we don't need form submission */}
+      <div className="mt-12 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-12 xl:gap-x-16">
         <section aria-labelledby="cart-heading" className="lg:col-span-7">
           <h2 id="cart-heading" className="sr-only">
             Items in your shopping cart
@@ -76,7 +81,7 @@ export default function CartPage() {
           >
             {items.map((item, index) => (
               <CartItem
-                key={`${item.productId}-${item.size}-${item.color}-${index}`}
+                key={`${item.productId}-${item.sizeId}-${item.colorId}-${index}`}
                 item={item}
               />
             ))}
@@ -102,16 +107,53 @@ export default function CartPage() {
                 {formatPrice(getTotalPrice())}
               </dd>
             </div>
-            {/* Add more details like shipping, taxes here if needed */}
+            <div className="flex items-center justify-between">
+              <dt className="text-sm text-gray-600">Shipping</dt>
+              <dd className="text-sm font-medium text-gray-900">
+                {formatPrice(150)} {/* Fixed shipping rate */}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-sm text-gray-600">Tax (12%)</dt>
+              <dd className="text-sm font-medium text-gray-900">
+                {formatPrice(getTotalPrice() * 0.12)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+              <dt className="text-base font-medium text-gray-900">
+                Order total
+              </dt>
+              <dd className="text-base font-medium text-gray-900">
+                {formatPrice(getTotalPrice() + 150 + getTotalPrice() * 0.12)}
+              </dd>
+            </div>
           </dl>
 
           <div className="mt-6">
-            <Button type="submit" className="w-full">
-              Checkout
+            {/* Changed from type="submit" to onClick handler */}
+            <Button
+              onClick={handleCheckout}
+              className="w-full"
+              disabled={items.length === 0}
+            >
+              Proceed to Checkout
             </Button>
           </div>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              or{" "}
+              <Link
+                href="/products"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Continue Shopping
+                <span aria-hidden="true"> &rarr;</span>
+              </Link>
+            </p>
+          </div>
         </section>
-      </form>
+      </div>
     </div>
   );
 }
