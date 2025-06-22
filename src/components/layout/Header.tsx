@@ -15,6 +15,9 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import CartItem from "../cart/CartItem";
+import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlistStore";
 
 // This component will run on the client and attempt to re-authenticate the user
 // if they have a valid refresh token. This keeps the user logged in across sessions.
@@ -58,6 +61,8 @@ export default function Header() {
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const cartCount = useCartStore((state) => state.getItemCount());
+  const wishlistCount = useWishlistStore((state) => state.items.length);
 
   const handleLogout = async () => {
     try {
@@ -140,7 +145,7 @@ export default function Header() {
                 >
                   <HeartIcon className="h-6 w-6" />
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    0
+                    {wishlistCount}
                   </span>
                 </Link>
                 <Link
@@ -149,7 +154,7 @@ export default function Header() {
                 >
                   <ShoppingCartIcon className="h-6 w-6" />
                   <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    0
+                    {cartCount}
                   </span>
                 </Link>
               </div>

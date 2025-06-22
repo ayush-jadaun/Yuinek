@@ -1,5 +1,3 @@
-// src/components/cart/CartItem.tsx
-
 "use client";
 
 import Image from "next/image";
@@ -24,7 +22,11 @@ export default function CartItem({ item }: CartItemProps) {
     const newQuantity = parseInt(e.target.value, 10);
     if (!isNaN(newQuantity) && newQuantity >= 0) {
       updateQuantity(
-        { productId: item.productId, size: item.size, color: item.color },
+        {
+          productId: item.productId,
+          sizeId: item.sizeId,
+          colorId: item.colorId,
+        },
         newQuantity
       );
     }
@@ -33,8 +35,8 @@ export default function CartItem({ item }: CartItemProps) {
   const handleRemove = () => {
     removeItem({
       productId: item.productId,
-      size: item.size,
-      color: item.color,
+      sizeId: item.sizeId,
+      colorId: item.colorId,
     });
   };
 
@@ -61,8 +63,8 @@ export default function CartItem({ item }: CartItemProps) {
                 {item.name}
               </Link>
             </h3>
-            <p className="mt-1 text-sm text-gray-500">{item.color}</p>
-            <p className="mt-1 text-sm text-gray-500">Size: {item.size}</p>
+            <p className="mt-1 text-sm text-gray-500">{item.colorId}</p>
+            <p className="mt-1 text-sm text-gray-500">Size: {item.sizeId}</p>
           </div>
 
           <div className="mt-4 sm:mt-0 sm:pr-9">

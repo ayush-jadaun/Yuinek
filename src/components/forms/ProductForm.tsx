@@ -93,8 +93,14 @@ export default function ProductForm({ product }: ProductFormProps) {
     meta_description: product?.meta_description || "",
     variants:
       product?.variants?.map((v) => ({
-        color_id: typeof v.color_id === "object" ? v.color_id._id : v.color_id,
-        size_id: typeof v.size_id === "object" ? v.size_id._id : v.size_id,
+        color_id:
+          typeof v.color_id === "object" && v.color_id !== null
+            ? String((v.color_id as any)._id)
+            : String(v.color_id),
+        size_id:
+          typeof v.size_id === "object" && v.size_id !== null
+            ? String((v.size_id as any)._id)
+            : String(v.size_id),
         sku: v.sku || "",
         price_adjustment: v.price_adjustment || 0,
         stock_quantity: v.stock_quantity || 0,
@@ -116,7 +122,9 @@ export default function ProductForm({ product }: ProductFormProps) {
           fetch("/api/admin/colors"),
           fetch("/api/admin/sizes"),
         ]);
-
+        let categoriesData: { categories: CategoryOption[] } = {
+          categories: [],
+        };
         if (categoriesRes.ok) {
           const categoriesData = await categoriesRes.json();
           setCategories(categoriesData.categories || []);

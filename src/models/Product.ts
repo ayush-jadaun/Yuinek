@@ -1,12 +1,14 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IColor } from "./Color";
 import { ISize } from "./Size";
+
 export interface IProductVariant {
   size_id: ISize;
   color_id: IColor;
   stock_quantity: number;
   price_adjustment: number;
   is_active: boolean;
+  sku: string; // <-- Add this line!
 }
 
 export interface IProductImage {
@@ -17,6 +19,7 @@ export interface IProductImage {
 }
 
 export interface IProduct extends Document {
+  _id:string,
   name: string;
   product_code: number;
   category_id: mongoose.Types.ObjectId;
@@ -47,6 +50,7 @@ const ProductVariantSchema = new Schema<IProductVariant>({
   stock_quantity: { type: Number, required: true, min: 0 },
   price_adjustment: { type: Number, default: 0 },
   is_active: { type: Boolean, default: true },
+  sku: { type: String, required: true }, // <-- Add this line!
 });
 
 const ProductImageSchema = new Schema<IProductImage>({

@@ -34,16 +34,26 @@ export default function ProductCard({ product }: ProductCardProps) {
   } = useWishlistStore();
   const { addItem: addToCart } = useCartStore();
 
-  const isWishlisted = isInWishlist(product._id.toString());
+  // Fallback for no images
   const primaryImage =
-    product.images.find((img) => img.is_primary) || product.images[0];
-  const secondaryImage = product.images[1] || primaryImage;
+    product.images && product.images.length > 0
+      ? product.images.find((img) => img.is_primary) || product.images[0]
+      : undefined;
+  const secondaryImage =
+    product.images && product.images.length > 1
+      ? product.images[1]
+      : primaryImage;
 
+  const isWishlisted = isInWishlist(product._id.toString());
+
+  // sale_price logic
   const hasDiscount =
-    product.sale_price && product.sale_price < product.base_price;
+    product.sale_price !== undefined &&
+    product.sale_price !== null &&
+    product.sale_price < product.base_price;
   const discountPercentage = hasDiscount
     ? Math.round(
-        ((product.base_price - product.sale_price) / product.base_price) * 100
+        ((product.base_price - product.sale_price!) / product.base_price) * 100
       )
     : 0;
 
@@ -59,7 +69,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         name: product.name,
         slug: product.slug,
         image: primaryImage?.image_url || "/placeholder.png",
-        price: product.sale_price || product.base_price,
+        price: product.sale_price ?? product.base_price,
       });
     }
   };
@@ -71,24 +81,45 @@ export default function ProductCard({ product }: ProductCardProps) {
     // Add first available variant to cart
     const firstVariant = product.variants[0];
     if (firstVariant) {
-      addToCart({
-        productId: product._id.toString(),
-        name: product.name,
-        slug: product.slug,
-        image: primaryImage?.image_url || "/placeholder.png",
-        color:
-          typeof firstVariant.color_id === "object"
-            ? firstVariant.color_id.name
-            : "Default",
-        size:
-          typeof firstVariant.size_id === "object"
-            ? firstVariant.size_id.us_size
-            : "Default",
-        quantity: 1,
-        price: product.sale_price || product.base_price,
-      });
+      const color =
+        typeof firstVariant.color_id === "object" && firstVariant.color_id
+          ? firstVariant.color_id.name
+          : "Default";
+      const size =
+        typeof firstVariant.size_id === "object" && firstVariant.size_id
+          ? firstVariant.size_id.us_size
+          : "Default";
+          addToCart({
+            productId: product._id.toString(),
+            name: product.name,
+            slug: product.slug,
+            image: primaryImage?.image_url || "/placeholder.png",
+            colorId:
+              firstVariant && typeof firstVariant.color_id === "object"
+                ? String(firstVariant.color_id._id)
+                : String(firstVariant.color_id || "Default"),
+            sizeId:
+              firstVariant && typeof firstVariant.size_id === "object"
+                ? String(firstVariant.size_id._id)
+                : String(firstVariant.size_id || "Default"),
+            quantity: 1,
+            price: product.sale_price ?? product.base_price,
+          });
     }
   };
+
+  // Unique colors for color dots
+  const uniqueColors = [
+    ...new Set(
+      product.variants
+        .map((v) =>
+          typeof v.color_id === "object" && v.color_id
+            ? v.color_id.hex_code
+            : "#ccc"
+        )
+        .filter(Boolean)
+    ),
+  ];
 
   return (
     <div
@@ -101,7 +132,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Link href={`/products/${product.slug}`}>
           <Image
             src={
-              isHovered && secondaryImage
+              isHovered && secondaryImage?.image_url
                 ? secondaryImage.image_url
                 : primaryImage?.image_url || "/placeholder.png"
             }
@@ -191,30 +222,20 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Link>
 
         {/* Available Colors */}
-        {product.variants && product.variants.length > 0 && (
+        {uniqueColors.length > 0 && (
           <div className="mt-3 flex items-center gap-1">
             <span className="text-xs text-gray-500">Colors:</span>
             <div className="flex gap-1">
-              {[
-                ...new Set(
-                  product.variants.map((v) =>
-                    typeof v.color_id === "object"
-                      ? v.color_id.hex_code
-                      : "#ccc"
-                  )
-                ),
-              ]
-                .slice(0, 4)
-                .map((color, index) => (
-                  <div
-                    key={index}
-                    className="w-4 h-4 rounded-full border border-gray-200"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              {product.variants.length > 4 && (
+              {uniqueColors.slice(0, 4).map((color, index) => (
+                <div
+                  key={index}
+                  className="w-4 h-4 rounded-full border border-gray-200"
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              {uniqueColors.length > 4 && (
                 <span className="text-xs text-gray-500">
-                  +{product.variants.length - 4}
+                  +{uniqueColors.length - 4}
                 </span>
               )}
             </div>

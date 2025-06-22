@@ -1,5 +1,3 @@
-// src/store/cartStore.ts
-
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -14,11 +12,11 @@ export interface CartItem {
   quantity: number;
 }
 
-// Define a unique identifier for a cart item
+// Corrected identifier type
 type CartItemIdentifier = {
   productId: string;
-  size: string;
-  color: string;
+  sizeId: string;
+  colorId: string;
 };
 
 interface CartState {
@@ -41,8 +39,8 @@ export const useCartStore = create<CartState>()(
           const existingItemIndex = state.items.findIndex(
             (item) =>
               item.productId === newItem.productId &&
-              item.size === newItem.size &&
-              item.color === newItem.color
+              item.sizeId === newItem.sizeId &&
+              item.colorId === newItem.colorId
           );
 
           if (existingItemIndex > -1) {
@@ -63,8 +61,8 @@ export const useCartStore = create<CartState>()(
             (item) =>
               !(
                 item.productId === identifier.productId &&
-                item.size === identifier.size &&
-                item.color === identifier.color
+                item.sizeId === identifier.sizeId &&
+                item.colorId === identifier.colorId
               )
           ),
         }));
@@ -75,12 +73,12 @@ export const useCartStore = create<CartState>()(
           items: state.items
             .map((item) =>
               item.productId === identifier.productId &&
-              item.size === identifier.size &&
-              item.color === identifier.color
-                ? { ...item, quantity: Math.max(0, quantity) } // Ensure quantity isn't negative
+              item.sizeId === identifier.sizeId &&
+              item.colorId === identifier.colorId
+                ? { ...item, quantity: Math.max(0, quantity) }
                 : item
             )
-            .filter((item) => item.quantity > 0), // Remove item if quantity is 0
+            .filter((item) => item.quantity > 0),
         }));
       },
 
@@ -98,8 +96,8 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      name: "cart-storage", // name of the item in storage
-      storage: createJSONStorage(() => localStorage), // use localStorage
+      name: "cart-storage",
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );
