@@ -7,6 +7,7 @@ import Product from "@/models/Product";
 import Category from "@/models/Category";
 import Size from "@/models/Size";
 import Color from "@/models/Color";
+import User from "@/models/User";
 
 interface Params {
   id: string;

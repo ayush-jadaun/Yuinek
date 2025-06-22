@@ -2,7 +2,7 @@ import { IOrder } from "@/models/Order";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import OrderStatusUpdater from "@/components/admin/OrderStatusUpdater";
-
+import User from "@/models/User";
 interface OrderDetailPageProps {
   params: { orderId: string };
 }
