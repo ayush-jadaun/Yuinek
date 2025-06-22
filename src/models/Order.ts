@@ -1,5 +1,17 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface IOrderAddress {
+  first_name: string;
+  last_name: string;
+  address_line_1: string;
+  address_line_2?: string;
+  city: string;
+  state_province: string;
+  postal_code: string;
+  country: string;
+  [key: string]: any;
+}
+
 export interface IOrderItem {
   product_id: mongoose.Types.ObjectId;
   product_variant_id?: mongoose.Types.ObjectId;
@@ -28,8 +40,8 @@ export interface IOrder extends Document {
   discount_amount: number;
   total_amount: number;
   currency: string;
-  billing_address: object;
-  shipping_address: object;
+  billing_address: IOrderAddress;
+  shipping_address: IOrderAddress;
   items: IOrderItem[];
   payment_method: string;
   payment_status:
@@ -77,8 +89,8 @@ const OrderSchema = new Schema<IOrder>(
     discount_amount: { type: Number, default: 0, min: 0 },
     total_amount: { type: Number, required: true, min: 0 },
     currency: { type: String, default: "PHP" },
-    billing_address: { type: Schema.Types.Mixed, required: true },
-    shipping_address: { type: Schema.Types.Mixed, required: true },
+    billing_address: { type: Schema.Types.Mixed, required: true }, // Use IOrderAddress in TS
+    shipping_address: { type: Schema.Types.Mixed, required: true }, // Use IOrderAddress in TS
     items: [OrderItemSchema],
     payment_method: { type: String, required: true },
     payment_status: {

@@ -31,7 +31,7 @@ export default function OrderStatusUpdater({
     setIsLoading(true);
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });

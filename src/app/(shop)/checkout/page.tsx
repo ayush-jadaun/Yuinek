@@ -110,7 +110,7 @@ export default function CheckoutPage() {
         })),
         shippingAddressId,
         billingAddressId,
-        paymentMethod,
+        payment_method: paymentMethod, // <-- Corrected key
       };
 
       console.log("Creating order with payload:", orderPayload);

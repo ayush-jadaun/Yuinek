@@ -55,12 +55,15 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
 
   const isWishlisted = isInWishlist(product._id.toString());
   const hasDiscount =
-    product.sale_price && product.sale_price < product.base_price;
-  const discountPercentage = hasDiscount
-    ? Math.round(
-        ((product.base_price - product.sale_price) / product.base_price) * 100
-      )
-    : 0;
+    product.sale_price !== undefined &&
+    product.sale_price !== null &&
+    product.sale_price < product.base_price;
+  const discountPercentage =
+    hasDiscount && product.sale_price !== undefined
+      ? Math.round(
+          ((product.base_price - product.sale_price) / product.base_price) * 100
+        )
+      : 0;
 
   const handleAddToCart = () => {
     setError(null);
@@ -84,7 +87,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
 
-    const price = product.sale_price || product.base_price;
+    const price = product.sale_price ?? product.base_price;
     const adjustedPrice = price + (variant.price_adjustment || 0);
     const primaryImage =
       product.images.find((img) => img.is_primary) || product.images[0];
@@ -94,8 +97,14 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       name: product.name,
       slug: product.slug,
       image: primaryImage?.image_url || "/placeholder.png",
-      color: selectedColor,
-      size: selectedSize,
+      colorId:
+        typeof variant.color_id === "object"
+          ? String(variant.color_id._id)
+          : String(variant.color_id ?? selectedColor ?? "Default"),
+      sizeId:
+        typeof variant.size_id === "object"
+          ? String(variant.size_id._id)
+          : String(variant.size_id ?? selectedSize ?? "Default"),
       quantity: quantity,
       price: adjustedPrice,
     });
@@ -116,7 +125,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         name: product.name,
         slug: product.slug,
         image: primaryImage?.image_url || "/placeholder.png",
-        price: product.sale_price || product.base_price,
+        price: product.sale_price ?? product.base_price,
       });
     }
   };
@@ -187,7 +196,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         {hasDiscount ? (
           <div className="flex items-center gap-3">
             <span className="text-3xl font-bold text-gray-900">
-              {formatPrice(product.sale_price!)}
+              {formatPrice(product.sale_price ?? product.base_price)}
             </span>
             <span className="text-xl text-gray-500 line-through">
               {formatPrice(product.base_price)}

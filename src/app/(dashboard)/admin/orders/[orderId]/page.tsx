@@ -1,12 +1,29 @@
-// src/app/(dashboard)/admin/orders/[id]/page.tsx
-
 import { IOrder } from "@/models/Order";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import OrderStatusUpdater from "@/components/admin/OrderStatusUpdater";
 
 interface OrderDetailPageProps {
-  params: { id: string };
+  params: { orderId: string };
+}
+
+interface IPopulatedUser {
+  _id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+interface IOrderAddress {
+  first_name: string;
+  last_name: string;
+  address_line_1: string;
+  address_line_2?: string;
+  city: string;
+  state_province: string;
+  postal_code: string;
+  country: string;
+  [key: string]: any;
 }
 
 const formatPrice = (price: number = 0) => {
@@ -16,13 +33,13 @@ const formatPrice = (price: number = 0) => {
   }).format(price);
 };
 
-async function getOrder(id: string) {
+async function getOrder(orderId: string) {
   try {
     const apiUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const cookieStore = cookies();
+    const cookieStore = await cookies(); 
     const token = cookieStore.get("accessToken");
 
-    const res = await fetch(`${apiUrl}/api/orders/${id}`, {
+    const res = await fetch(`${apiUrl}/api/orders/${orderId}`, {
       cache: "no-store",
       headers: { Cookie: `accessToken=${token?.value}` },
     });
@@ -31,7 +48,7 @@ async function getOrder(id: string) {
     const data = await res.json();
     return data.order;
   } catch (error) {
-    console.error(`[GET_ADMIN_ORDER_ERROR: ${id}]`, error);
+    console.error(`[GET_ADMIN_ORDER_ERROR: ${orderId}]`, error);
     return null;
   }
 }
@@ -39,7 +56,8 @@ async function getOrder(id: string) {
 export async function generateMetadata({
   params,
 }: OrderDetailPageProps): Promise<Metadata> {
-  const order: IOrder | null = await getOrder(params.id);
+  const { orderId } = await params;
+  const order: IOrder | null = await getOrder(orderId);
   if (!order) return { title: "Order Not Found" };
   return { title: `Order ${order.order_number}` };
 }
@@ -47,7 +65,9 @@ export async function generateMetadata({
 export default async function AdminOrderDetailPage({
   params,
 }: OrderDetailPageProps) {
-  const order: IOrder | null = await getOrder(params.id);
+  
+  const { orderId } = await params;
+  const order: IOrder | null = await getOrder(orderId);
 
   if (!order) {
     return (
@@ -56,6 +76,19 @@ export default async function AdminOrderDetailPage({
       </p>
     );
   }
+
+  // User type guard/cast
+  let user: IPopulatedUser | null = null;
+  if (
+    order.user_id &&
+    typeof order.user_id === "object" &&
+    "first_name" in order.user_id
+  ) {
+    user = order.user_id as unknown as IPopulatedUser;
+  }
+
+  // Address type safety
+  const shippingAddress = order.shipping_address as IOrderAddress;
 
   return (
     <div>
@@ -75,7 +108,7 @@ export default async function AdminOrderDetailPage({
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
           <OrderStatusUpdater
-            orderId={order._id}
+            orderId={order._id as string}
             currentStatus={order.status}
           />
         </div>
@@ -91,7 +124,7 @@ export default async function AdminOrderDetailPage({
               </h3>
               <ul role="list" className="mt-6 divide-y divide-gray-200">
                 {order.items.map((item) => (
-                  <li key={item.product_id} className="flex py-4">
+                  <li key={String(item.product_id)} className="flex py-4">
                     {/* In a real app, you would have an image here */}
                     <div className="ml-3 flex flex-1 flex-col">
                       <div>
@@ -127,10 +160,16 @@ export default async function AdminOrderDetailPage({
                 Customer
               </h3>
               <div className="mt-4 text-sm text-gray-600">
-                <p>
-                  {order.user_id.first_name} {order.user_id.last_name}
-                </p>
-                <p>{order.user_id.email}</p>
+                {user ? (
+                  <>
+                    <p>
+                      {user.first_name} {user.last_name}
+                    </p>
+                    <p>{user.email}</p>
+                  </>
+                ) : (
+                  <p>User ID: {order.user_id?.toString()}</p>
+                )}
               </div>
             </div>
           </div>
@@ -141,19 +180,17 @@ export default async function AdminOrderDetailPage({
               </h3>
               <address className="mt-4 not-italic text-sm text-gray-600">
                 <p>
-                  {order.shipping_address.first_name}{" "}
-                  {order.shipping_address.last_name}
+                  {shippingAddress.first_name} {shippingAddress.last_name}
                 </p>
-                <p>{order.shipping_address.address_line_1}</p>
-                {order.shipping_address.address_line_2 && (
-                  <p>{order.shipping_address.address_line_2}</p>
+                <p>{shippingAddress.address_line_1}</p>
+                {shippingAddress.address_line_2 && (
+                  <p>{shippingAddress.address_line_2}</p>
                 )}
                 <p>
-                  {order.shipping_address.city},{" "}
-                  {order.shipping_address.state_province}{" "}
-                  {order.shipping_address.postal_code}
+                  {shippingAddress.city}, {shippingAddress.state_province}{" "}
+                  {shippingAddress.postal_code}
                 </p>
-                <p>{order.shipping_address.country}</p>
+                <p>{shippingAddress.country}</p>
               </address>
             </div>
           </div>

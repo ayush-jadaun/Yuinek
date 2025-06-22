@@ -4,8 +4,8 @@ import { verifyAccessToken, JWTPayload } from "@/lib/auth/jwt";
 import Order from "@/models/Order";
 import User from "@/models/User";
 import Product from "@/models/Product";
-import Size from "@/models/Size"; 
-import Color from "@/models/Color"; 
+import Size from "@/models/Size";
+import Color from "@/models/Color";
 import mongoose from "mongoose";
 
 // Function to generate a unique order number
@@ -54,12 +54,28 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Get order data from request
-    const { items, shippingAddressId, billingAddressId, paymentMethod } =
-      await request.json();
+    const body = await request.json();
+    // Accept both camelCase and snake_case for payment_method for safety
+    const {
+      items,
+      shippingAddressId,
+      billingAddressId,
+      payment_method,
+      paymentMethod,
+    } = body;
+
+    // Backwards compatibility: prefer snake_case, fallback to camelCase
+    const paymentMethodFinal = payment_method ?? paymentMethod;
 
     if (!items || items.length === 0) {
       return NextResponse.json(
         { error: "Cannot create an empty order." },
+        { status: 400 }
+      );
+    }
+    if (!paymentMethodFinal) {
+      return NextResponse.json(
+        { error: "Payment method is required." },
         { status: 400 }
       );
     }
@@ -71,10 +87,10 @@ export async function POST(request: NextRequest) {
     }
 
     const shipping_address = user.addresses.find(
-      (addr:any) => addr._id.toString() === shippingAddressId
+      (addr: any) => addr._id.toString() === shippingAddressId
     );
     const billing_address = user.addresses.find(
-      (addr:any) => addr._id.toString() === billingAddressId
+      (addr: any) => addr._id.toString() === billingAddressId
     );
 
     if (!shipping_address || !billing_address) {
@@ -95,7 +111,7 @@ export async function POST(request: NextRequest) {
       }
 
       const variant = product.variants.find(
-        (v:any) =>
+        (v: any) =>
           v.size_id.toString() === item.sizeId &&
           v.color_id.toString() === item.colorId
       );
@@ -162,7 +178,7 @@ export async function POST(request: NextRequest) {
       total_amount,
       shipping_address,
       billing_address,
-      paymentMethod,
+      payment_method: paymentMethodFinal, // <-- FIXED: always snake_case
       status: "pending",
       payment_status: "pending",
     });
