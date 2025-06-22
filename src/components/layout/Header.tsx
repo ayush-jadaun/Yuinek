@@ -24,6 +24,7 @@ import { useWishlistStore } from "@/store/wishlistStore";
 const AuthInitializer = () => {
   const { user, setUser, setLoading } = useAuthStore();
 
+
   useEffect(() => {
     const initializeAuth = async () => {
       // If user is already set, or we've already tried, do nothing.
@@ -63,6 +64,16 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const cartCount = useCartStore((state) => state.getItemCount());
   const wishlistCount = useWishlistStore((state) => state.items.length);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+      setIsMobileMenuOpen(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -122,7 +133,10 @@ export default function Header() {
             </div>
 
             {/* Search Bar (Desktop) */}
-            <div className="hidden lg:flex items-center flex-1 max-w-lg mx-8">
+            <form
+              onSubmit={handleSearch}
+              className="hidden lg:flex items-center flex-1 max-w-lg mx-8"
+            >
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
@@ -130,10 +144,12 @@ export default function Header() {
                 <input
                   type="text"
                   placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-white/20 rounded-full bg-white/10 backdrop-blur-sm focus:bg-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 text-gray-700 placeholder:text-gray-500"
                 />
               </div>
-            </div>
+            </form>
 
             {/* Right Side */}
             <div className="flex items-center space-x-4">
@@ -290,16 +306,23 @@ export default function Header() {
 
                 {/* Mobile Search */}
                 <div className="pt-3 border-t border-white/10">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                  <form
+                    onSubmit={handleSearch}
+                    className="pt-3 border-t border-white/10"
+                  >
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-white/20 rounded-full bg-white/10 backdrop-blur-sm focus:bg-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700 placeholder:text-gray-500"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Search products..."
-                      className="block w-full pl-10 pr-3 py-2 border border-white/20 rounded-full bg-white/10 backdrop-blur-sm focus:bg-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700 placeholder:text-gray-500"
-                    />
-                  </div>
+                  </form>
                 </div>
               </div>
             </div>
