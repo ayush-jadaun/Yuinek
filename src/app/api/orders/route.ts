@@ -85,6 +85,17 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+    
+    // === PHONE VERIFICATION CHECK ===
+    if (!user.phone_verified) {
+      return NextResponse.json(
+        {
+          error:
+            "Phone number not verified. Please verify your phone number before placing an order.",
+        },
+        { status: 403 }
+      );
+    }
 
     const shipping_address = user.addresses.find(
       (addr: any) => addr._id.toString() === shippingAddressId

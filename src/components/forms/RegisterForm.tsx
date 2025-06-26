@@ -1,5 +1,3 @@
-// src/components/forms/RegisterForm.tsx
-
 "use client";
 
 import { useState, FormEvent } from "react";
@@ -11,6 +9,7 @@ export default function RegisterForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState(""); // New phone field
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -48,6 +47,7 @@ export default function RegisterForm() {
           first_name: firstName,
           last_name: lastName,
           email,
+          phone, // send phone
           password,
         }),
       });
@@ -60,17 +60,15 @@ export default function RegisterForm() {
         );
       }
 
-      // 3. Handle success
-      setSuccess("Registration successful! Redirecting to login...");
-
-      // Redirect to login page after a short delay to show the success message
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      // 3. Redirect to phone verification page
+      router.push(
+        `/verify-phone?user=${encodeURIComponent(
+          data.user.id
+        )}&phone=${encodeURIComponent(data.user.phone)}`
+      );
     } catch (err: any) {
       setError(err.message);
     } finally {
-      // Don't set isLoading to false if redirecting on success
       if (error) {
         setIsLoading(false);
       }
@@ -139,6 +137,28 @@ export default function RegisterForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="phone"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Phone number
+        </label>
+        <div className="mt-1">
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            required
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={isLoading}
+            placeholder="e.g. 09171234567"
           />
         </div>
       </div>

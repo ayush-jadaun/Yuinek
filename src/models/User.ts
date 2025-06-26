@@ -6,6 +6,9 @@ export interface IUser extends Document {
   first_name: string;
   last_name: string;
   phone?: string;
+  phone_verified: boolean;
+  phone_verification_code?: string;
+  phone_verification_expires?: Date;
   user_type: "customer" | "admin" | "staff";
   is_active: boolean;
   email_verified: boolean;
@@ -57,6 +60,9 @@ const UserSchema = new Schema<IUser>(
     first_name: { type: String, required: true, trim: true },
     last_name: { type: String, required: true, trim: true },
     phone: { type: String, trim: true },
+    phone_verified: { type: Boolean, default: false },
+    phone_verification_code: { type: String },
+    phone_verification_expires: { type: Date },
     user_type: {
       type: String,
       enum: ["customer", "admin", "staff"],

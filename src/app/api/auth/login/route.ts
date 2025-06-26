@@ -9,21 +9,11 @@ import {
   hashToken,
 } from "@/lib/auth/jwt";
 
-
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
-
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-
-  // Vercel-specific header
+  if (forwarded) return forwarded.split(",")[0].trim();
   const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
-  if (vercelForwarded) {
-    return vercelForwarded.split(",")[0].trim();
-  }
-
-  // Fallback for local development or other environments
+  if (vercelForwarded) return vercelForwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") || "127.0.0.1";
 }
 
@@ -39,6 +29,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
+      );
+    }
+
+    // Check if phone is verified (optional: only if user has a phone number)
+    if (user.phone && user.phone_verified === false) {
+      return NextResponse.json(
+        {
+          error:
+            "Phone number not verified. Please verify your phone number to login.",
+        },
+        { status: 403 }
       );
     }
 
@@ -60,7 +61,6 @@ export async function POST(request: NextRequest) {
 
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
-
     const clientIp = getClientIp(request);
 
     // Store refresh token
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       user_id: user._id,
       token_hash: hashToken(refreshToken),
       device_info: request.headers.get("user-agent") || "Unknown",
-      ip_address: clientIp, // Use the extracted IP address
+      ip_address: clientIp,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     });
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Login Error:", error); // Log the actual error for debugging
+    console.error("Login Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
