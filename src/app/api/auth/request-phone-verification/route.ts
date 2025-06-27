@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { sendSms } from "@/lib/sms/sendSms"; // You'd implement this for your SMS provider
+import { sendVerification } from "@/lib/sms/sendVerification"; // This should trigger Twilio Verify
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,17 +15,20 @@ export async function POST(request: NextRequest) {
 
     if (phone) user.phone = phone;
 
-    // Generate 6-digit code
-    const code = 123456
-
-    user.phone_verification_code = code;
-    user.phone_verification_expires = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
+    // Reset verification state
     user.phone_verified = false;
 
     await user.save();
 
-    // Send SMS
-    // await sendSms(user.phone, `Your verification code is: ${code}`);
+    // Send verification code via Twilio Verify (do not generate or store code here)
+    try {
+      await sendVerification(user.phone); // This should call Twilio Verify API for SMS
+    } catch (err) {
+      return NextResponse.json(
+        { error: "Failed to send verification code" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ message: "Verification code sent." });
   } catch (error) {

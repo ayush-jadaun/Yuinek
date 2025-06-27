@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db/mongodb";
 import User from "@/models/User";
-import { sendSms } from "@/lib/sms/sendSms";
+import { sendVerification } from "@/lib/sms/sendVerification";
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,24 +34,23 @@ export async function POST(request: NextRequest) {
       phone_verified: false,
     };
 
-    // Generate and set code/expiry if phone is present
+    // If phone is present, trigger verification via Twilio Verify
     if (phone) {
-      userData.phone_verification_code = "123456"; // Always string!
-      userData.phone_verification_expires = new Date(
-        Date.now() + 10 * 60 * 1000
-      ); // 10 min
+      // Send verification code via Twilio Verify
+      try {
+        await sendVerification(phone);
+        // Optionally: you could store a "pending verification" state, but
+        // do NOT store any code - the check will happen later by comparing user input to Twilio's service.
+      } catch (err) {
+        return NextResponse.json(
+          { error: "Failed to send verification code" },
+          { status: 500 }
+        );
+      }
     }
-    console.log("userData:", userData);
+
     // Create user
     const user = await User.create(userData);
-
-    // Send verification code via SMS if phone was provided
-    // if (phone && userData.phone_verification_code) {
-    //   await sendSms(
-    //     phone,
-    //     `Your verification code is: ${userData.phone_verification_code}`
-    //   );
-    // }
 
     return NextResponse.json(
       {
