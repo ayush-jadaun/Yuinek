@@ -72,6 +72,20 @@ export default function ProductForm({ product }: ProductFormProps) {
   const router = useRouter();
   const { images, addImages, removeImage, uploadAllImages } = useImageUpload();
 
+  // SAFELY EXTRACT CATEGORY_ID AS STRING
+  const getCategoryIdString = (cat: unknown): string => {
+    if (typeof cat === "string") return cat;
+    if (
+      typeof cat === "object" &&
+      cat !== null &&
+      "_id" in cat &&
+      typeof (cat as any)._id === "string"
+    ) {
+      return (cat as any)._id;
+    }
+    return "";
+  };
+
   const [formData, setFormData] = useState<FormData>({
     name: product?.name || "",
     product_code: product?.product_code || 0,
@@ -82,10 +96,7 @@ export default function ProductForm({ product }: ProductFormProps) {
     cost_price: product?.cost_price || 0,
     weight: product?.weight || 0,
     slug: product?.slug || "",
-    category_id:
-      typeof product?.category_id === "object" && product?.category_id !== null
-        ? product.category_id._id
-        : product?.category_id || "",
+    category_id: getCategoryIdString(product?.category_id),
     is_featured: product?.is_featured ?? false,
     is_active: product?.is_active ?? true,
     stock_status: product?.stock_status || "in_stock",
@@ -97,11 +108,15 @@ export default function ProductForm({ product }: ProductFormProps) {
     variants:
       product?.variants?.map((v) => ({
         color_id:
-          typeof v.color_id === "object" && v.color_id !== null
+          typeof v.color_id === "object" &&
+          v.color_id !== null &&
+          "_id" in v.color_id
             ? String((v.color_id as any)._id)
             : String(v.color_id),
         size_id:
-          typeof v.size_id === "object" && v.size_id !== null
+          typeof v.size_id === "object" &&
+          v.size_id !== null &&
+          "_id" in v.size_id
             ? String((v.size_id as any)._id)
             : String(v.size_id),
         sku: v.sku || "",
@@ -131,6 +146,16 @@ export default function ProductForm({ product }: ProductFormProps) {
         if (categoriesRes.ok) {
           const categoriesData = await categoriesRes.json();
           setCategories(categoriesData.categories || []);
+          if (
+            !product &&
+            categoriesData.categories?.length > 0 &&
+            !formData.category_id
+          ) {
+            setFormData((prev) => ({
+              ...prev,
+              category_id: categoriesData.categories[0]._id,
+            }));
+          }
         }
 
         if (colorsRes.ok) {
@@ -142,18 +167,6 @@ export default function ProductForm({ product }: ProductFormProps) {
           const sizesData = await sizesRes.json();
           setSizes(sizesData.sizes || []);
         }
-
-        // Set default category for new products
-        if (
-          !product &&
-          categoriesData.categories?.length > 0 &&
-          !formData.category_id
-        ) {
-          setFormData((prev) => ({
-            ...prev,
-            category_id: categoriesData.categories[0]._id,
-          }));
-        }
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("Failed to load form data");
@@ -161,6 +174,7 @@ export default function ProductForm({ product }: ProductFormProps) {
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Generate product code for new products
@@ -171,6 +185,7 @@ export default function ProductForm({ product }: ProductFormProps) {
         product_code: generateProductCode(),
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product]);
 
   const handleChange = (
@@ -295,11 +310,7 @@ export default function ProductForm({ product }: ProductFormProps) {
       // Prepare product data with images
       const productData = {
         ...formData,
-        category_id:
-          typeof formData.category_id === "object" &&
-          formData.category_id !== null
-            ? formData.category_id._id
-            : formData.category_id,
+        category_id: getCategoryIdString(formData.category_id),
         images: imageUrls.map((url, index) => ({
           image_url: url,
           alt_text: `${formData.name} - Image ${index + 1}`,
@@ -311,11 +322,6 @@ export default function ProductForm({ product }: ProductFormProps) {
         ? `/api/products/${product._id}`
         : "/api/products";
       const method = product ? "PUT" : "POST";
-      console.log(
-        "Submitting category_id:",
-        productData.category_id,
-        typeof productData.category_id
-      );
 
       const res = await fetch(apiEndpoint, {
         method,
