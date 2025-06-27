@@ -15,6 +15,9 @@ export interface IUser extends Document {
   addresses: IAddress[];
   createdAt: Date;
   updatedAt: Date;
+  // Add for password reset
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
 }
 
 export interface IAddress {
@@ -71,6 +74,9 @@ const UserSchema = new Schema<IUser>(
     is_active: { type: Boolean, default: true },
     email_verified: { type: Boolean, default: false },
     addresses: [AddressSchema],
+    // Add for password reset:
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
   {
     timestamps: true,
