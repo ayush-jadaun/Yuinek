@@ -5,11 +5,23 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
+// Minimal country code list, you can expand as needed
+const COUNTRY_CODES = [
+  { code: "+1", label: "🇺🇸 US (+1)" },
+  { code: "+44", label: "🇬🇧 UK (+44)" },
+  { code: "+91", label: "🇮🇳 India (+91)" },
+  { code: "+63", label: "🇵🇭 PH (+63)" },
+  { code: "+61", label: "🇦🇺 AU (+61)" },
+  { code: "+81", label: "🇯🇵 JP (+81)" },
+  // ...add more as desired
+];
+
 export default function RegisterForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState(""); // New phone field
+  const [countryCode, setCountryCode] = useState(COUNTRY_CODES[0].code); // default to first
+  const [phone, setPhone] = useState(""); // only local part
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -38,6 +50,11 @@ export default function RegisterForm() {
       return;
     }
 
+    // Format phone as E.164: +<countrycode><number>
+    // Remove leading zero from phone if present
+    let formattedPhone = phone.replace(/^0+/, "");
+    formattedPhone = countryCode + formattedPhone;
+
     try {
       // 2. API call
       const res = await fetch("/api/auth/register", {
@@ -47,7 +64,7 @@ export default function RegisterForm() {
           first_name: firstName,
           last_name: lastName,
           email,
-          phone, // send phone
+          phone: formattedPhone, // send E.164 format
           password,
         }),
       });
@@ -148,7 +165,21 @@ export default function RegisterForm() {
         >
           Phone number
         </label>
-        <div className="mt-1">
+        <div className="mt-1 flex">
+          <select
+            className="rounded-l-md border-gray-300 bg-gray-50 text-gray-900 text-sm focus:ring-indigo-500 focus:border-indigo-500 block w-21"
+            value={countryCode}
+            onChange={(e) => setCountryCode(e.target.value)}
+            disabled={isLoading}
+            required
+            aria-label="Country code"
+          >
+            {COUNTRY_CODES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </select>
           <Input
             id="phone"
             name="phone"
@@ -158,7 +189,9 @@ export default function RegisterForm() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             disabled={isLoading}
-            placeholder="e.g. 09171234567"
+            placeholder="e.g. 9123456789"
+            className="rounded-l-none"
+            style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
           />
         </div>
       </div>
