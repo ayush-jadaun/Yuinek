@@ -72,12 +72,9 @@ export async function PUT(
 ) {
   try {
     await connectDB();
-
-    // Await params before using
     const { id } = await params;
     const data = await request.json();
 
-    // Validate the ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
@@ -85,11 +82,52 @@ export async function PUT(
       );
     }
 
-    const product = await Product.findByIdAndUpdate(
-      id,
-      { ...data, updatedAt: new Date() },
-      { new: true, runValidators: true }
-    ).populate("category_id", "name slug");
+    // --- FIX: Normalize category_id ---
+    let updateData = { ...data, updatedAt: new Date() };
+    if (updateData.category_id) {
+      // If frontend sent an object, extract ._id
+      if (
+        typeof updateData.category_id === "object" &&
+        updateData.category_id !== null &&
+        updateData.category_id._id
+      ) {
+        updateData.category_id = updateData.category_id._id;
+      }
+      // If still not a valid ObjectId string, reject
+      if (!mongoose.Types.ObjectId.isValid(updateData.category_id)) {
+        return NextResponse.json(
+          { error: "Invalid category id" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Optional: Also normalize variants' size_id and color_id if needed
+    if (Array.isArray(updateData.variants)) {
+      updateData.variants = updateData.variants.map((variant: any) => {
+        const newVariant = { ...variant };
+        if (
+          newVariant.size_id &&
+          typeof newVariant.size_id === "object" &&
+          newVariant.size_id._id
+        ) {
+          newVariant.size_id = newVariant.size_id._id;
+        }
+        if (
+          newVariant.color_id &&
+          typeof newVariant.color_id === "object" &&
+          newVariant.color_id._id
+        ) {
+          newVariant.color_id = newVariant.color_id._id;
+        }
+        return newVariant;
+      });
+    }
+
+    const product = await Product.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("category_id", "name slug");
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -148,5 +186,3 @@ export async function DELETE(
     );
   }
 }
-
-

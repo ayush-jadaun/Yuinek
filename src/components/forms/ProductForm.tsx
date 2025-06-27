@@ -82,7 +82,10 @@ export default function ProductForm({ product }: ProductFormProps) {
     cost_price: product?.cost_price || 0,
     weight: product?.weight || 0,
     slug: product?.slug || "",
-    category_id: product?.category_id?.toString() || "",
+    category_id:
+      typeof product?.category_id === "object" && product?.category_id !== null
+        ? product.category_id._id
+        : product?.category_id || "",
     is_featured: product?.is_featured ?? false,
     is_active: product?.is_active ?? true,
     stock_status: product?.stock_status || "in_stock",
@@ -292,6 +295,11 @@ export default function ProductForm({ product }: ProductFormProps) {
       // Prepare product data with images
       const productData = {
         ...formData,
+        category_id:
+          typeof formData.category_id === "object" &&
+          formData.category_id !== null
+            ? formData.category_id._id
+            : formData.category_id,
         images: imageUrls.map((url, index) => ({
           image_url: url,
           alt_text: `${formData.name} - Image ${index + 1}`,
@@ -303,6 +311,11 @@ export default function ProductForm({ product }: ProductFormProps) {
         ? `/api/products/${product._id}`
         : "/api/products";
       const method = product ? "PUT" : "POST";
+      console.log(
+        "Submitting category_id:",
+        productData.category_id,
+        typeof productData.category_id
+      );
 
       const res = await fetch(apiEndpoint, {
         method,
