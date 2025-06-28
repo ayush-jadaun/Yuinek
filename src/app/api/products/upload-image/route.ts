@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,54 +34,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert File to buffer & base64
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Create upload directory if it doesn't exist
-    const uploadDir = join(process.cwd(), "public", "uploads", "products");
-
-    try {
-      if (!existsSync(uploadDir)) {
-        await mkdir(uploadDir, { recursive: true });
+    // Upload to Cloudinary
+    const uploadResult = await new Promise<{ url: string; public_id: string }>(
+      (resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream(
+            {
+              folder: "products",
+              resource_type: "image",
+            },
+            function (error, result) {
+              if (error || !result) {
+                reject(error || new Error("Cloudinary upload failed"));
+              } else {
+                resolve({
+                  url: result.secure_url,
+                  public_id: result.public_id,
+                });
+              }
+            }
+          )
+          .end(buffer);
       }
-    } catch (mkdirError) {
-      console.error("Error creating upload directory:", mkdirError);
-      return NextResponse.json(
-        { error: "Failed to create upload directory" },
-        { status: 500 }
-      );
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 15);
-    const extension = file.name.split(".").pop()?.toLowerCase();
-
-    if (!extension) {
-      return NextResponse.json(
-        { error: "File must have a valid extension" },
-        { status: 400 }
-      );
-    }
-
-    const filename = `${timestamp}-${randomString}.${extension}`;
-    const filepath = join(uploadDir, filename);
-
-    try {
-      await writeFile(filepath, buffer);
-    } catch (writeError) {
-      console.error("Error writing file:", writeError);
-      return NextResponse.json(
-        { error: "Failed to save file" },
-        { status: 500 }
-      );
-    }
-
-    const url = `/uploads/products/${filename}`;
+    );
 
     return NextResponse.json({
-      url,
-      filename,
+      url: uploadResult.url,
+      public_id: uploadResult.public_id,
       size: file.size,
       type: file.type,
     });
