@@ -43,6 +43,31 @@ export interface IProduct extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface IProductFrontend {
+  _id: string;
+  name: string;
+  product_code: number;
+  category_id: string;
+  description: string;
+  slug: string;
+  base_price: number;
+  sale_price?: number;
+  cost_price?: number;
+  weight?: number;
+  is_featured: boolean;
+  is_active: boolean;
+  stock_status: "in_stock" | "out_of_stock" | "pre_order";
+  manage_stock: boolean;
+  stock_quantity: number;
+  low_stock_threshold: number;
+  images: IProductImage[];
+  variants: IProductVariant[];
+  meta_title?: string;
+  meta_description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 
 const ProductVariantSchema = new Schema<IProductVariant>({
   size_id: { type: Schema.Types.ObjectId, ref: "Size", required: true },
