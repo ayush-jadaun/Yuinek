@@ -1,6 +1,7 @@
 // src/components/layout/Footer.tsx
 
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -10,10 +11,15 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           <div className="space-y-4">
-            <Link href="/" className="-m-1.5 p-1.5">
-              <span className="text-xl font-bold tracking-tight">
-                ShoeStore
-              </span>
+            <Link href="/" className="-m-1.5 p-1.5 flex items-center space-x-3">
+              <Image
+                src="/images/logo.png"
+                alt="Yuinek Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
+              <span className="text-xl font-bold tracking-tight">Yuinek</span>
             </Link>
             <p className="text-sm leading-6 text-gray-300">
               The best place to find your sole mate. High-quality footwear for
@@ -116,7 +122,7 @@ export default function Footer() {
         </div>
         <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24">
           <p className="text-xs leading-5 text-gray-400">
-            © {currentYear} ShoeStore, Inc. All rights reserved.
+            © {currentYear} Yuinek, Inc. All rights reserved.
           </p>
         </div>
       </div>

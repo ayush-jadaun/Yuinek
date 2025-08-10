@@ -10,7 +10,7 @@ interface ProductPageProps {
   }>;
 }
 
-// This function fetches a single product by its slug
+// Fetch product by slug
 async function getProduct(slug: string): Promise<IProduct | null> {
   try {
     const apiUrl =
@@ -18,7 +18,6 @@ async function getProduct(slug: string): Promise<IProduct | null> {
       process.env.NEXT_PUBLIC_BASE_URL ||
       "http://localhost:3000";
 
-    // Use the API route that can handle both ID and slug
     const res = await fetch(`${apiUrl}/api/products/${slug}`, {
       next: { revalidate: 60 },
       headers: {
@@ -39,11 +38,10 @@ async function getProduct(slug: string): Promise<IProduct | null> {
   }
 }
 
-// Generate metadata for the page dynamically
+// Dynamic metadata
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
-  // Await params before using
   const { slug } = await params;
   const product = await getProduct(slug);
 
@@ -53,6 +51,7 @@ export async function generateMetadata({
       description: "The requested product could not be found.",
     };
   }
+
   return {
     title: product.meta_title || product.name,
     description:
@@ -70,7 +69,6 @@ export async function generateMetadata({
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  // Await params before using
   const { slug } = await params;
   const product = await getProduct(slug);
 
@@ -82,7 +80,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
             Product Not Found
           </h1>
           <p className="text-gray-600 mb-8 text-sm sm:text-base">
-            The product you&apos;re looking for doesn&lsquo;t exist or has been removed.
+            The product you&apos;re looking for doesn&apos;t exist or has been
+            removed.
           </p>
           <Link
             href="/products"
@@ -95,100 +94,82 @@ export default async function ProductPage({ params }: ProductPageProps) {
     );
   }
 
-  // Ensure images array exists and has at least one item
   const primaryImage = product.images?.[0];
   const secondaryImage = product.images?.[1];
   const tertiaryImage = product.images?.[2];
 
   return (
-    <div className="pt-4 sm:pt-6">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        {/* Mobile Image Gallery */}
-        <div className="block lg:hidden mb-6">
-          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-            <Image
-              src={primaryImage?.image_url || "/images/logo.png"}
-              alt={primaryImage?.alt_text || product.name}
-              width={600}
-              height={600}
-              className="h-full w-full object-cover object-center"
-              priority
-            />
-          </div>
-          {/* Mobile thumbnail gallery */}
-          {(secondaryImage || tertiaryImage) && (
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-              {secondaryImage && (
-                <div className="flex-shrink-0 aspect-square w-20 overflow-hidden rounded-lg bg-gray-100">
+    <div className="bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
+        {/* Amazon-Style Layout: Left Images, Right Details */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+          {/* Left Side - Images Section (Amazon Style) */}
+          <div className="lg:col-span-5 xl:col-span-4">
+            <div className="flex flex-col lg:flex-row lg:space-x-4">
+              {/* Thumbnail Column (Left side on desktop) */}
+              <div className="order-2 lg:order-1 lg:w-16 xl:w-20">
+                <div className="flex flex-row lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2 mt-4 lg:mt-0 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+                  {/* Primary Image Thumbnail */}
+                  <div className="flex-shrink-0 w-12 h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 border border-gray-200 rounded cursor-pointer hover:border-orange-500 transition-colors">
+                    <Image
+                      src={primaryImage?.image_url || "/images/logo.png"}
+                      alt={primaryImage?.alt_text || product.name}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover rounded"
+                    />
+                  </div>
+
+                  {/* Secondary Image Thumbnail */}
+                  {secondaryImage && (
+                    <div className="flex-shrink-0 w-12 h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 border border-gray-200 rounded cursor-pointer hover:border-orange-500 transition-colors">
+                      <Image
+                        src={secondaryImage.image_url}
+                        alt={secondaryImage.alt_text || product.name}
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    </div>
+                  )}
+
+                  {/* Tertiary Image Thumbnail */}
+                  {tertiaryImage && (
+                    <div className="flex-shrink-0 w-12 h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 border border-gray-200 rounded cursor-pointer hover:border-orange-500 transition-colors">
+                      <Image
+                        src={tertiaryImage.image_url}
+                        alt={tertiaryImage.alt_text || product.name}
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Image (Right side on desktop) */}
+              <div className="order-1 lg:order-2 flex-1">
+                <div className="aspect-square bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <Image
-                    src={secondaryImage.image_url}
-                    alt={secondaryImage.alt_text || product.name}
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover object-center"
+                    src={primaryImage?.image_url || "/images/logo.png"}
+                    alt={primaryImage?.alt_text || product.name}
+                    width={800}
+                    height={800}
+                    className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300 cursor-zoom-in"
+                    priority
                   />
                 </div>
-              )}
-              {tertiaryImage && (
-                <div className="flex-shrink-0 aspect-square w-20 overflow-hidden rounded-lg bg-gray-100">
-                  <Image
-                    src={tertiaryImage.image_url}
-                    alt={tertiaryImage.alt_text || product.name}
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover object-center"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Desktop Layout */}
-        <div className="hidden lg:grid lg:grid-cols-3 lg:gap-x-8">
-          {/* Main Image */}
-          <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
-            <Image
-              src={primaryImage?.image_url || "/images/logo.png"}
-              alt={primaryImage?.alt_text || product.name}
-              width={800}
-              height={1000}
-              className="h-full w-full object-cover object-center"
-              priority
-            />
-          </div>
-
-          {/* Side Images */}
-          <div className="grid grid-cols-1 gap-y-8">
-            <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
-              <Image
-                src={secondaryImage?.image_url || "/images/logo.png"}
-                alt={secondaryImage?.alt_text || product.name}
-                width={500}
-                height={625}
-                className="h-full w-full object-cover object-center"
-              />
-            </div>
-            <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
-              <Image
-                src={tertiaryImage?.image_url || "/images/logo.png"}
-                alt={tertiaryImage?.alt_text || product.name}
-                width={500}
-                height={625}
-                className="h-full w-full object-cover object-center"
-              />
+              </div>
             </div>
           </div>
 
-          {/* Product Details */}
-          <div className="mt-0">
-            <ProductDetails product={product} />
+          {/* Right Side - Product Details (Amazon Style) */}
+          <div className="mt-6 lg:mt-0 lg:col-span-7 xl:col-span-8">
+            <div className="max-w-none">
+              <ProductDetails product={product} />
+            </div>
           </div>
-        </div>
-
-        {/* Mobile Product Details */}
-        <div className="block lg:hidden mt-6">
-          <ProductDetails product={product} />
         </div>
       </div>
     </div>
