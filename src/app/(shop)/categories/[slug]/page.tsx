@@ -1,8 +1,6 @@
-// src/app/(shop)/categories/[slug]/page.tsx
-
 import ProductGrid from "@/components/product/ProductGrid";
-import { IProduct } from "@/models/Product";
 import { ICategory } from "@/models/Category";
+import { IProduct } from "@/models/Product";
 import type { Metadata } from "next";
 
 interface CategoryPageProps {
@@ -12,25 +10,26 @@ interface CategoryPageProps {
 async function getCategoryData(slug: string) {
   try {
     const apiUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    // Fetch products for this category
+
     const productsRes = await fetch(`${apiUrl}/api/products?category=${slug}`, {
       next: { revalidate: 60 },
     });
     if (!productsRes.ok)
       throw new Error("Failed to fetch products for category");
-    const productsData = await productsRes.json();
+    const productsData: { products: IProduct[] } = await productsRes.json();
 
-    // Fetch the category details itself (to get the name, description)
-    // A better way would be a new API endpoint /api/categories/[slug]
     const categoriesRes = await fetch(`${apiUrl}/api/categories`);
-    const allCategoriesData = await categoriesRes.json();
+    if (!categoriesRes.ok) throw new Error("Failed to fetch categories");
+    const allCategoriesData: { categories: ICategory[] } =
+      await categoriesRes.json();
+
     const categoryDetails = allCategoriesData.categories.find(
-      (c: ICategory) => c.slug === slug
+      (c) => c.slug === slug
     );
 
     return {
       products: productsData.products,
-      category: categoryDetails,
+      category: categoryDetails ?? null,
     };
   } catch (error) {
     console.error(`[GET_CATEGORY_DATA_ERROR: ${slug}]`, error);
@@ -38,18 +37,26 @@ async function getCategoryData(slug: string) {
   }
 }
 
-export async function generateMetadata({
-  params,
-}: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata(
+  props: Promise<CategoryPageProps> // ✅ params is async now
+): Promise<Metadata> {
+  const { params } = await props; // ✅ must await
   const { category } = await getCategoryData(params.slug);
-  if (!category) return { title: "Category Not Found" };
+
+  if (!category) {
+    return { title: "Category Not Found" };
+  }
+
   return {
     title: category.name,
     description: `Shop for products in the ${category.name} category.`,
   };
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage(
+  props: Promise<CategoryPageProps> // ✅ params is async now
+) {
+  const { params } = await props; // ✅ must await
   const { products, category } = await getCategoryData(params.slug);
 
   if (!category) {

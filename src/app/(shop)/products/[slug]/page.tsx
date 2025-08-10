@@ -1,6 +1,7 @@
 import { IProduct } from "@/models/Product";
 import ProductDetails from "@/components/product/ProductDetails";
 import Image from "next/image";
+import Link from "next/link";
 import type { Metadata } from "next";
 
 interface ProductPageProps {
@@ -75,20 +76,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center max-w-md mx-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
             Product Not Found
           </h1>
-          <p className="text-gray-600 mb-8">
-            The product you're looking for doesn't exist or has been removed.
+          <p className="text-gray-600 mb-8 text-sm sm:text-base">
+            The product you&apos;re looking for doesn&lsquo;t exist or has been removed.
           </p>
-          <a
+          <Link
             href="/products"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base font-medium"
           >
             Browse All Products
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -100,43 +101,95 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const tertiaryImage = product.images?.[2];
 
   return (
-    <div className="pt-6">
-      <div className="mx-auto mt-6 max-w-2xl sm:px-6 lg:grid lg:max-w-7xl lg:grid-cols-3 lg:gap-x-8 lg:px-8">
-        {/* Image gallery */}
-        <div className="aspect-h-4 aspect-w-3 hidden overflow-hidden rounded-lg lg:block">
-          <Image
-            src={primaryImage?.image_url || "/placeholder.png"}
-            alt={primaryImage?.alt_text || product.name}
-            width={800}
-            height={800}
-            className="h-full w-full object-cover object-center"
-            priority
-          />
-        </div>
-
-        <div className="hidden lg:grid lg:grid-cols-1 lg:gap-y-8">
-          <div className="aspect-h-2 aspect-w-3 overflow-hidden rounded-lg">
+    <div className="pt-4 sm:pt-6">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+        {/* Mobile Image Gallery */}
+        <div className="block lg:hidden mb-6">
+          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             <Image
-              src={secondaryImage?.image_url || "/placeholder.png"}
-              alt={secondaryImage?.alt_text || product.name}
-              width={500}
-              height={500}
+              src={primaryImage?.image_url || "/images/logo.png"}
+              alt={primaryImage?.alt_text || product.name}
+              width={600}
+              height={600}
               className="h-full w-full object-cover object-center"
+              priority
             />
           </div>
-          <div className="aspect-h-2 aspect-w-3 overflow-hidden rounded-lg">
+          {/* Mobile thumbnail gallery */}
+          {(secondaryImage || tertiaryImage) && (
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {secondaryImage && (
+                <div className="flex-shrink-0 aspect-square w-20 overflow-hidden rounded-lg bg-gray-100">
+                  <Image
+                    src={secondaryImage.image_url}
+                    alt={secondaryImage.alt_text || product.name}
+                    width={80}
+                    height={80}
+                    className="h-full w-full object-cover object-center"
+                  />
+                </div>
+              )}
+              {tertiaryImage && (
+                <div className="flex-shrink-0 aspect-square w-20 overflow-hidden rounded-lg bg-gray-100">
+                  <Image
+                    src={tertiaryImage.image_url}
+                    alt={tertiaryImage.alt_text || product.name}
+                    width={80}
+                    height={80}
+                    className="h-full w-full object-cover object-center"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden lg:grid lg:grid-cols-3 lg:gap-x-8">
+          {/* Main Image */}
+          <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
             <Image
-              src={tertiaryImage?.image_url || "/placeholder.png"}
-              alt={tertiaryImage?.alt_text || product.name}
-              width={500}
-              height={500}
+              src={primaryImage?.image_url || "/images/logo.png"}
+              alt={primaryImage?.alt_text || product.name}
+              width={800}
+              height={1000}
               className="h-full w-full object-cover object-center"
+              priority
             />
+          </div>
+
+          {/* Side Images */}
+          <div className="grid grid-cols-1 gap-y-8">
+            <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
+              <Image
+                src={secondaryImage?.image_url || "/images/logo.png"}
+                alt={secondaryImage?.alt_text || product.name}
+                width={500}
+                height={625}
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+            <div className="aspect-[4/5] overflow-hidden rounded-lg bg-gray-100">
+              <Image
+                src={tertiaryImage?.image_url || "/images/logo.png"}
+                alt={tertiaryImage?.alt_text || product.name}
+                width={500}
+                height={625}
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+          </div>
+
+          {/* Product Details */}
+          <div className="mt-0">
+            <ProductDetails product={product} />
           </div>
         </div>
 
-        {/* Product info */}
-        <ProductDetails product={product} />
+        {/* Mobile Product Details */}
+        <div className="block lg:hidden mt-6">
+          <ProductDetails product={product} />
+        </div>
       </div>
     </div>
   );

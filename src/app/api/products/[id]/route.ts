@@ -2,61 +2,88 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongodb";
 import mongoose from "mongoose";
 
-// Import ALL models to ensure they're registered BEFORE using them
+// Import ALL referenced models so Mongoose registers them
+import "@/models/Category";
+import "@/models/Size";
+import "@/models/Color";
 import Product from "@/models/Product";
-import Category from "@/models/Category";
-import Size from "@/models/Size";
-import Color from "@/models/Color";
-import User from "@/models/User";
 
 interface Params {
   id: string;
 }
 
+interface VariantUpdate {
+  size_id: string | { _id: string };
+  color_id: string | { _id: string };
+  stock_quantity: number;
+  price_adjustment: number;
+  is_active: boolean;
+  sku: string;
+}
+
+interface ProductUpdateData {
+  name?: string;
+  product_code?: number;
+  category_id?: string | { _id: string };
+  description?: string;
+  short_description?: string;
+  base_price?: number;
+  sale_price?: number;
+  cost_price?: number;
+  weight?: number;
+  slug?: string;
+  is_featured?: boolean;
+  is_active?: boolean;
+  stock_status?: "in_stock" | "out_of_stock" | "pre_order";
+  manage_stock?: boolean;
+  stock_quantity?: number;
+  low_stock_threshold?: number;
+  images?: Array<{
+    color_id?: string;
+    image_url: string;
+    alt_text?: string;
+    is_primary: boolean;
+  }>;
+  variants?: VariantUpdate[];
+  meta_title?: string;
+  meta_description?: string;
+  updatedAt?: Date;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
 
-    // Await params before using
-    const { id } = await params;
+    const { id } = await context.params;
 
-    // Check if it's a valid ObjectId or slug
-    let product;
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      product = await Product.findById(id);
-    } else {
-      product = await Product.findOne({ slug: id });
-    }
+    const query = mongoose.Types.ObjectId.isValid(id)
+      ? { _id: id }
+      : { slug: id };
 
-    if (!product || !product.is_active) {
+    const product = await Product.findOne(query)
+      .populate("category_id", "name slug")
+      .populate({
+        path: "variants.size_id",
+        select: "us_size eu_size uk_size cm_size gender",
+      })
+      .populate({
+        path: "variants.color_id",
+        select: "name hex_code",
+      })
+      .populate({
+        path: "images.color_id",
+        select: "name hex_code",
+      })
+      .lean();
+
+    if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Try to populate, but if it fails, return the product without population
-    try {
-      const populatedProduct = await Product.findById(product._id)
-        .populate("category_id", "name slug")
-        .populate({
-          path: "variants.size_id",
-          select: "us_size eu_size uk_size cm_size gender",
-          model: "Size", // Explicitly specify the model
-        })
-        .populate({
-          path: "variants.color_id",
-          select: "name hex_code",
-          model: "Color", // Explicitly specify the model
-        })
-        .lean();
-
-      return NextResponse.json({ product: populatedProduct });
-    } catch (populateError) {
-      console.error("Population error:", populateError);
-      // Return the basic product without population if populate fails
-      return NextResponse.json({ product: product.toObject() });
-    }
+    return NextResponse.json({ product });
   } catch (error) {
     console.error("Product GET error:", error);
     return NextResponse.json(
@@ -68,12 +95,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
-    const { id } = await params;
-    const data = await request.json();
+
+    const { id } = await context.params;
+    const data: ProductUpdateData = await request.json();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -82,19 +110,20 @@ export async function PUT(
       );
     }
 
-    // --- FIX: Normalize category_id ---
-    let updateData = { ...data, updatedAt: new Date() };
+    const updateData: ProductUpdateData = { ...data, updatedAt: new Date() };
+
     if (updateData.category_id) {
-      // If frontend sent an object, extract ._id
       if (
         typeof updateData.category_id === "object" &&
         updateData.category_id !== null &&
-        updateData.category_id._id
+        "_id" in updateData.category_id
       ) {
         updateData.category_id = updateData.category_id._id;
       }
-      // If still not a valid ObjectId string, reject
-      if (!mongoose.Types.ObjectId.isValid(updateData.category_id)) {
+      if (
+        typeof updateData.category_id === "string" &&
+        !mongoose.Types.ObjectId.isValid(updateData.category_id)
+      ) {
         return NextResponse.json(
           { error: "Invalid category id" },
           { status: 400 }
@@ -102,21 +131,20 @@ export async function PUT(
       }
     }
 
-    // Optional: Also normalize variants' size_id and color_id if needed
     if (Array.isArray(updateData.variants)) {
-      updateData.variants = updateData.variants.map((variant: any) => {
+      updateData.variants = updateData.variants.map((variant) => {
         const newVariant = { ...variant };
         if (
           newVariant.size_id &&
           typeof newVariant.size_id === "object" &&
-          newVariant.size_id._id
+          "_id" in newVariant.size_id
         ) {
           newVariant.size_id = newVariant.size_id._id;
         }
         if (
           newVariant.color_id &&
           typeof newVariant.color_id === "object" &&
-          newVariant.color_id._id
+          "_id" in newVariant.color_id
         ) {
           newVariant.color_id = newVariant.color_id._id;
         }
@@ -148,15 +176,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
   try {
     await connectDB();
 
-    // Await params before using
-    const { id } = await params;
+    const { id } = await context.params;
 
-    // Validate the ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
@@ -164,7 +190,6 @@ export async function DELETE(
       );
     }
 
-    // Soft delete - set is_active to false
     const product = await Product.findByIdAndUpdate(
       id,
       { is_active: false, updatedAt: new Date() },

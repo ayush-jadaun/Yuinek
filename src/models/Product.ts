@@ -19,7 +19,7 @@ export interface IProductImage {
 }
 
 export interface IProduct extends Document {
-  _id:string,
+  _id: string;
   name: string;
   product_code: number;
   category_id: mongoose.Types.ObjectId;

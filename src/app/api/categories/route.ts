@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongodb";
-import Category from "@/models/Category";
+import Category, { ICategory } from "@/models/Category";
+import { FilterQuery } from "mongoose";
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,8 @@ export async function GET(request: NextRequest) {
     const includeInactive = searchParams.get("includeInactive") === "true";
     const parentId = searchParams.get("parentId");
 
-    let query: any = {};
+    // Proper type for MongoDB query
+    const query: FilterQuery<ICategory> = {};
 
     if (!includeInactive) {
       query.is_active = true;
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     const categories = await Category.find(query)
       .populate("parent_id", "name slug")
       .sort({ name: 1 })
-      .lean();
+      .lean<ICategory[]>();
 
     return NextResponse.json({ categories });
   } catch (error) {
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const data = await request.json();
+    const data: Omit<ICategory, "_id" | "slug"> = await request.json();
 
     // Create slug from name
     const slug = data.name

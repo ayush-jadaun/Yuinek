@@ -9,6 +9,7 @@ import {
   StarIcon,
   PlayIcon,
 } from "@heroicons/react/24/outline";
+import Image from "next/image";
 
 async function getFeaturedProducts(): Promise<IProduct[]> {
   try {
@@ -41,7 +42,7 @@ export default async function HomePage() {
             <div className="mt-24 sm:mt-32 lg:mt-16">
               <a href="#" className="inline-flex space-x-6">
                 <span className="rounded-full bg-indigo-600/10 px-3 py-1 text-sm font-semibold leading-6 text-indigo-600 ring-1 ring-inset ring-indigo-600/10">
-                  What's new
+                  What&apos;s new
                 </span>
                 <span className="inline-flex items-center space-x-2 text-sm font-medium leading-6 text-gray-600">
                   <span>Just shipped v2.0</span>
@@ -106,8 +107,8 @@ export default async function HomePage() {
           <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
             <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
               <div className="relative rounded-3xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
-                <img
-                  src="/placeholder.png"
+                <Image
+                  src="/images/logo.png"
                   alt="Hero shoes"
                   width={2432}
                   height={1442}
@@ -134,8 +135,8 @@ export default async function HomePage() {
               Everything you need for the perfect fit
             </p>
             <p className="mt-6 text-lg leading-8 text-gray-600">
-              We're committed to providing the best shopping experience with
-              premium quality products and exceptional service.
+              We&apos;re committed to providing the best shopping experience
+              with premium quality products and exceptional service.
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-4xl">
@@ -160,8 +161,8 @@ export default async function HomePage() {
                   Easy Returns
                 </dt>
                 <dd className="mt-2 text-base leading-7 text-gray-600">
-                  30-day return policy. No questions asked. We'll even pay for
-                  return shipping.
+                  30-day return policy. No questions asked. We&apos;ll even pay
+                  for return shipping.
                 </dd>
               </div>
               <div className="relative pl-16">
@@ -283,7 +284,6 @@ export default async function HomePage() {
           </div>
         </div>
       </div>
-
 
       {/* Social Proof */}
       <div className="bg-white py-24 sm:py-32">
